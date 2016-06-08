@@ -59,7 +59,7 @@ The motivation for this project is to:
 rm(list = ls(all=TRUE))
 
 # Load Libraries
-library(data.table); library(R.utils); 
+library(data.table); library(R.utils); library(dplyr)
 library(ggplot2); library(RColorBrewer); library(pander)
 # For Parallele Computing
 library("parallel"); library("foreach"); library("doParallel")
@@ -288,134 +288,109 @@ swC <- c(stopwords("en"),
 ## Create the iterator on the tokens
 it <- itoken(tokens)
 ## Generate the vocabulary using the iterator, 1-gram badwords / stopwords list.
-vocab <- create_vocabulary(it, ngram = c(ngram_min = 1L, ngram_max = 1L), stopwords = swC)
+vocab1 <- create_vocabulary(it, ngram = c(ngram_min = 1L, ngram_max = 1L), stopwords = swC)
 
-
-## So before corpus / dtm / tcm construction we need to reinitialise iterator : it
+## We need to reinitialise iterator : it
 ## Here we create dtm directly:
 it <- itoken(tokens)
-v_vectorizer <- vocab_vectorizer(vocab)
+v_vectorizer <- vocab_vectorizer(vocab1)
 dtm1 <- create_dtm(it, v_vectorizer)
 # check  that dtm keep documents names/ids as rownames
+rownames(dtm1)
 
-## Save dtm1 R objec
+## Save dtm1 R object
 save(dtm1, file = '../../data/Rda/dtm1.Rda')
 
+## Sum freq for each document / feature
+wordsFreq <- colSums(dtm1)
+
 ## Extract the top 100 most frequent concepts
-words <- colSums(dtm1)
-words <- words[order(words, decreasing = T)][1:100]
+top1 <- wordsFreq[order(wordsFreq, decreasing = T)][1:100]
+top1 <- data.frame(features = names(top1),
+                   freq = top1, row.names = NULL)
+top1 <- transform( 
+        top1,
+        features = reorder(features,freq))
+## Order factor by freq
+top1$features <-factor(top1$features, levels=top1[order(top1$freq), "features"])
 
 
-
-#dt1 <- data.table(term = vocab1$vocab$terms, count = vocab1$vocab$terms_count)
-#dt1 <- dt1[order(-count)]
-tracker <- rbind(tracker, data.frame(operation = "Create Vocabulary Unigram - text2vec", time = Sys.time()))
+tracker <- rbind(tracker, data.frame(operation = "Create Vocabulary / DTM Unigram - text2vec", time = Sys.time()))
 ```
 
-
-
-
-
-
-
-
-## Plotting Functions 
-
-```{r plotFunctions,  message=FALSE, warning=FALSE, echo=TRUE, eval=TRUE, cache=FALSE}
-makeTopFeaturesDfm <- function(aDfm,maxTopic){
-        top <- as.data.frame(topfeatures(aDfm, maxTopic))
-        names(top) <- c("freq"); top$feature <- rownames(top)
-        rownames(top) <- NULL
-        top <- dplyr::select(top, feature, freq)
-        top
-}
-
-plotFeatures <- function(featureDf) {
-        g <- ggplot(data = featureDf)
-        g <- g + geom_bar(aes(x = reorder(term, count), y = count), stat = "identity")
-        g <- g +  coord_flip()
-        g
-}
-```
-
-
-## Exploring Uni-grams
-
-```{r wordCloudUni, message=FALSE, warning=FALSE, echo=TRUE, cache=FALSE, eval=TRUE}
-wordcloud::wordcloud(names(words), words, colors = brewer.pal(6, "Dark2"), scale = c(8, .5))
-#wordcloud::wordcloud(dt1[1:100,term], dt1[1:100,count], colors = brewer.pal(6, "Dark2"), scale = c(8, .5))
-```
-
-```{r featurePlotUniGram, message=FALSE, warning=FALSE, echo=TRUE, cache=FALSE, eval=TRUE}
-plotFeatures(dt1[order(-count)][1:20])
-
-```
-
-## BiGrams
+## Bi Grams
 
 ```{r text2vecBiGrams, message=FALSE, warning=FALSE, cache=FALSE, echo = TRUE, eval=TRUE}
-it <- itoken(list(
-                paste(blogsSample, collapse = " "),
-                paste(newsSample, collapse = " "),
-                paste(twitterSample, collapse = "")
-                ), 
-             preprocess_function = preprocess , 
-             tokenizer = word_tokenizer)
-vocab2 <- create_vocabulary(it, stopwords = sw, ngram = c(ngram_min = 2L, ngram_max = 2L))
-dt2 <- data.table(term = vocab2$vocab$terms, count = vocab2$vocab$terms_count)
-dt2 <- dt2[order(-count)]
+## Create the iterator on the tokens
+it <- itoken(tokens)
+## Generate the vocabulary using the iterator, 1-gram badwords / stopwords list.
+vocab2 <- create_vocabulary(it, ngram = c(ngram_min = 2L, ngram_max = 2L), stopwords = swC)
+
+## We need to reinitialise iterator : it
+## Here we create dtm directly:
+it <- itoken(tokens)
+v_vectorizer <- vocab_vectorizer(vocab2)
+dtm2 <- create_dtm(it, v_vectorizer)
+# check  that dtm keep documents names/ids as rownames
+rownames(dtm2)
+object.size(dtm2) / 1024^2
+
+## Save dtm1 R object
+save(dtm2, file = '../../data/Rda/dtm2.Rda')
+
+## Sum freq for each document / feature
+wordsFreq <- colSums(dtm2)
+
+## Extract the top 100 most frequent concepts
+top2 <- wordsFreq[order(wordsFreq, decreasing = T)][1:100]
+top2 <- data.frame(features = names(top2),
+                   freq = top2, row.names = NULL)
+## Order factor by freq
+top2$features <-factor(top2$features, levels=top2[order(top2$freq), "features"])
+
+
 tracker <- rbind(tracker, data.frame(operation = "Create Vocabulary Bigram - text2vec", time = Sys.time()))
-
 ```
 
-
-```{r wordCloudBiGram, message=FALSE, warning=FALSE, echo=TRUE, cache=FALSE, eval=TRUE}
-wordcloud::wordcloud(dt2[1:100,term], dt2[1:100,count], colors = brewer.pal(6, "Dark2"), scale = c(8, .5))
-```
-
-```{r featurePlotBiGram, message=FALSE, warning=FALSE, echo=TRUE, cache=FALSE, eval=TRUE}
-plotFeatures(dt2[order(-count)][1:20])
-
-save(vocab2, file = '../../data/Rda/vocab2.Rda')
-rm(vocab2,dt2)
-gc()
-```
-
-
-## TriGrams
+## Tri Grams
 
 ```{r text2vecTriGrams, message=FALSE, warning=FALSE, cache=FALSE, echo = TRUE, eval=TRUE}
-it <- itoken(list(
-                paste(blogsSample, collapse = " "),
-                paste(newsSample, collapse = " "),
-                paste(twitterSample, collapse = "")
-                ), 
-             preprocess_function = preprocess , 
-             tokenizer = word_tokenizer)
-vocab3 <- create_vocabulary(it, stopwords = sw, ngram = c(ngram_min = 3L, ngram_max = 3L))
-dt3 <- data.table(term = vocab3$vocab$terms, count = vocab3$vocab$terms_count)
-dt3 <- dt3[order(-count)]
+## Create the iterator on the tokens
+it <- itoken(tokens)
+## Generate the vocabulary using the iterator, 1-gram badwords / stopwords list.
+vocab3 <- create_vocabulary(it, ngram = c(ngram_min = 3L, ngram_max = 3L), stopwords = swC)
+
+## We need to reinitialise iterator : it
+## Here we create dtm directly:
+it <- itoken(tokens)
+v_vectorizer <- vocab_vectorizer(vocab3)
+dtm3 <- create_dtm(it, v_vectorizer)
+# check  that dtm keep documents names/ids as rownames
+rownames(dtm3)
+object.size(dtm3) / 1024^2
+
+## Save dtm1 R object
+save(dtm3, file = '../../data/Rda/dtm2.Rda')
+
+## Sum freq for each document / feature
+wordsFreq <- colSums(dtm3)
+
+## Extract the top 100 most frequent concepts
+top3 <- wordsFreq[order(wordsFreq, decreasing = T)][1:100]
+top3 <- data.frame(features = names(top3),
+                   freq = top3, row.names = NULL)
+## Order factor by freq
+top3$features <-factor(top3$features, levels=top3[order(top3$freq), "features"])
+
+
+
 tracker <- rbind(tracker, data.frame(operation = "Create Vocabulary Trigram - text2vec", time = Sys.time()))
 
 ```
 
-
-```{r wordCloudTriGram, message=FALSE, warning=FALSE, echo=TRUE, cache=FALSE, eval=TRUE}
-wordcloud::wordcloud(dt3[1:100,term], dt3[1:100,count], colors = brewer.pal(6, "Dark2"), scale = c(8, .5))
-```
-
-```{r featurePlotTriGram, message=FALSE, warning=FALSE, echo=TRUE, cache=FALSE, eval=TRUE}
-plotFeatures(dt3[order(-count)][1:20])
-
-save(vocab3, file = '../../data/Rda/vocab3.Rda')
-rm(vocab3,dt3)
-gc()
-```
-
-
-
-
 # Exploratory Analysis
+
+## Principles
 
 ## Exploratory analysis
 The first step in building a predictive model for text is understanding the distribution and relationship between the words, tokens, and phrases in the text. The goal of this task is to understand the basic relationships you observe in the data and prepare to build your first linguistic models.
@@ -429,14 +404,58 @@ How many unique words do you need in a frequency sorted dictionary to cover 50% 
 How do you evaluate how many of the words come from foreign languages?
 Can you think of a way to increase the coverage -- identifying words that may not be in the corpora or using a smaller number of words in the dictionary to cover the same number of phrases?
 
+## Plotting Functions 
+
+```{r plotFunctions,  message=FALSE, warning=FALSE, echo=TRUE, eval=TRUE, cache=FALSE}
+plotFeatures <- function(featureDf) {
+        g <- ggplot(data = featureDf)
+        g <- g + geom_bar(aes(x = features, y = freq), stat = "identity")
+        g <- g +  coord_flip()
+        g
+}
+```
+
+
+## Exploring Uni-grams
+
+```{r wordCloudUni, message=FALSE, warning=FALSE, echo=TRUE, cache=FALSE, eval=TRUE}
+set.seed(1234)
+wordcloud::wordcloud(top1$features, top1$freq, colors = brewer.pal(6, "Dark2"), scale = c(8, .1))
+```
+
+```{r featurePlotUniGram, message=FALSE, warning=FALSE, echo=TRUE, cache=FALSE, eval=TRUE}
+plotFeatures(top1[1:30,])
+```
+
+## Exploring BiGrams
+
+
+```{r wordCloudBiGram, message=FALSE, warning=FALSE, echo=TRUE, cache=FALSE, eval=TRUE}
+set.seed(1234)
+wordcloud::wordcloud(top2$features, top2$freq, colors = brewer.pal(6, "Dark2"), scale = c(8, .1))
+```
+
+```{r featurePlotBiGram, message=FALSE, warning=FALSE, echo=TRUE, cache=FALSE, eval=TRUE}
+plotFeatures(top2[1:30,])
+```
+
+
+## Exploring TriGrams
+
+
+```{r wordCloudTriGram, message=FALSE, warning=FALSE, echo=TRUE, cache=FALSE, eval=TRUE}
+set.seed(1234)
+wordcloud::wordcloud(top3$features, top2$freq, colors = brewer.pal(6, "Dark2"), scale = c(8, .1))
+```
+
+```{r featurePlotTriGram, message=FALSE, warning=FALSE, echo=TRUE, cache=FALSE, eval=TRUE}
+plotFeatures(top3[1:30,])
+```
 
 
 
 
-
-
-
-
+# Appendix
 
 ## Processing time
 
