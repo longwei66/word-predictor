@@ -420,7 +420,7 @@ plotFeatures <- function(featureDf) {
 
 ```{r wordCloudUni, message=FALSE, warning=FALSE, echo=TRUE, cache=FALSE, eval=TRUE}
 set.seed(1234)
-wordcloud::wordcloud(top1$features, top1$freq, colors = brewer.pal(6, "Dark2"), scale = c(8, .1))
+wordcloud::wordcloud(top1$features, top1$freq, colors = brewer.pal(6, "Dark2"), scale = c(4, .1))
 ```
 
 ```{r featurePlotUniGram, message=FALSE, warning=FALSE, echo=TRUE, cache=FALSE, eval=TRUE}
@@ -432,7 +432,7 @@ plotFeatures(top1[1:30,])
 
 ```{r wordCloudBiGram, message=FALSE, warning=FALSE, echo=TRUE, cache=FALSE, eval=TRUE}
 set.seed(1234)
-wordcloud::wordcloud(top2$features, top2$freq, colors = brewer.pal(6, "Dark2"), scale = c(8, .1))
+wordcloud::wordcloud(top2$features, top2$freq, colors = brewer.pal(6, "Dark2"), scale = c(2, .1))
 ```
 
 ```{r featurePlotBiGram, message=FALSE, warning=FALSE, echo=TRUE, cache=FALSE, eval=TRUE}
@@ -445,7 +445,7 @@ plotFeatures(top2[1:30,])
 
 ```{r wordCloudTriGram, message=FALSE, warning=FALSE, echo=TRUE, cache=FALSE, eval=TRUE}
 set.seed(1234)
-wordcloud::wordcloud(top3$features, top2$freq, colors = brewer.pal(6, "Dark2"), scale = c(8, .1))
+wordcloud::wordcloud(top3$features, top2$freq, colors = brewer.pal(6, "Dark2"), scale = c(2, .1))
 ```
 
 ```{r featurePlotTriGram, message=FALSE, warning=FALSE, echo=TRUE, cache=FALSE, eval=TRUE}
