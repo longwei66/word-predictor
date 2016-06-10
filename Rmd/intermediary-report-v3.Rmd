@@ -11,52 +11,59 @@ output:
 
 # Introduction and Objective
 
-## Objective of the project
+The goal of this project is to build a product (we will call it a "word predictor") which can predict the next word knowing the first words of a sentence. The final result of the project consists in an application (built with Shiny framework) using a model and algorithm based on machine learning and natural language processing tools (NLP). The model will be built on an data set consisting in extracts from US news, twitter and blogs.
 
-The goal of this project is to build a product (word predictor) which can predict the next word knowing the first words of a sentence. The final result of the project consists in an application (built with Shiny framework) using a model and algorithm based on machine learning and natural language processing tools (NLP). The model will be built on an data set consisting in extracts from US news, twitter and blogs.
+**Overall approach**
 
-## Overall approach
 
-1 - Download the data, extract the zip file, make a summary of the file properties.
-2 - Load a random sample of the data in R (as the data set is huge, this is necessary to save time and memory).
-3 - Clean the data, tokenise (extract words).
-4 - Compute frequency for n-grams (sequence of 1 to n words : 1 to 3 in this report.
-5 - Exploratory data analysis.
-6 - Build the model.
-7 - Test the model.
-8 - Build a data product using the model to predict next words from the first words of a sentence.
-9 - Final report.
+1. Download the data, extract the zip file, make a summary of the file properties.
+2. Load a random sample of the data in R (as the data set is huge, this is necessary to save time and memory).
+3. Clean the data, tokenise (extract words).
+4. Compute frequency for n-grams (sequence of 1 to n words : 1 to 3 in this report) using DTM matrix.
+5. Exploratory data analysis.
+6. Build the model.
+7. Test the model.
+8. Build a data product using the model to predict next words from the first words of a sentence.
+9. Final report.
 
-## Objective of this document
+This intermediary report covers point 1 to 5, focusing on exploratory analysis. We will also describe our general approach and goals for next steps (building the model, prediction algorithm and data product).
 
-This document is an intermediary report covering point 1 to 5 of previous section, focusing on exploratory analysis. We will also describe our general approach and goals for next steps (building the model, prediction algorithm and data product).
+**Tokenization and DTM matrices**
 
-## Optimising performance and memory footprint
+Put here an explanation about what it is.
 
-As this dataset is very large and we will have constraints to run the shiny app, as special focus should be taken to optimised the model for smaller memory footprint.
+
+**About context**
+
+We will see later in the report but it's pretty obvious that the data was built in three very different contexts : blogs,  news reports and twitter. Using one or the other data set could lead in very different prediction as the vocabulary and style used is different depending on the context.
+
+At this stage, I am not sure what is the best approach, drop some of the data for prediction model or build a context specific model (one for each context, blog, news, twitter) or merge every and aim at a generic word predictor, independently of the context. Thus, here I will explore the merge data on one side and the context specific data.
+
+**Optimising performance and memory footprint**
+
+As this dataset is very large and we will have constraints to run the shiny app, as special focus should be taken to optimized the model for smaller memory footprint. We will use a time tracker to measure performance of each chunk.
 
 We found 3 alternatives of package for text mining :
 
 - tm, provide plenty of functions but its documentation is not straightforward and we faced memory issues for n-grams extractions
 - quanteda, a more recent package with better performance. This is the package we will use for basic data about the corpus of text
-- text2vec, the latest package in the text mining familly. Its documentation is quite limited but the performances are much better than the previous ones as it is coded in C and optimised for parallel processing. This is the package we use for computing n-grams.
+- text2vec, the latest package in the text mining family. Its documentation is quite limited but the performances are much better than the previous ones as it is coded in C and optimized for parallel processing. This is the package we use for computing n-grams.
 
-## Notes
-Explain only the major features of the data you have identified and briefly summarize your plans for creating the prediction algorithm and Shiny app in a way that would be understandable to a non-data scientist manager. 
+This reports shows only the most important chunks of codes, for the full source code, check our [github repo](https://github.com/longwei66/word-predictor/blob/master/Rmd/intermediary-report-v3.Rmd)
 
-The motivation for this project is to: 
-
-1. Demonstrate that you've downloaded the data and have successfully loaded it in.
-2. Create a basic report of summary statistics about the data sets.
-3. Report any interesting findings that you amassed so far.
-4. Get feedback on your plans for creating a prediction algorithm and Shiny app. 
-
-
-# Load data
+# HC Corpora data set
 
 ```{r configuration, echo=FALSE, warning=FALSE, message=FALSE, cache=FALSE, eval=TRUE}
 # Clear objects in memory
 rm(list = ls(all=TRUE))
+# Garbage collection (memory)
+gg <- gc(reset = TRUE)
+
+# Function to get remaining RAM
+getRam <- function() {
+        r <- as.numeric(gsub(pattern = "(.*): +(.*) +(.*)$", replacement = "\\3", x = system("free", intern = TRUE)[3]))/1024
+        round(r)
+}
 
 # Load Libraries
 library(data.table); library(R.utils); library(dplyr)
@@ -68,39 +75,23 @@ library(stringi); library(stringr); library(quanteda);
 library(tm);library(RWeka);
 library(text2vec); library(qdap); library(SnowballC)
 # Set a tracker data frame to record operation time
-tracker <- data.frame(operation = "init", time = Sys.time())
+tracker <- data.frame(operation = "init", time = Sys.time(), free.ram.Mo = getRam())
 
-# Garbage collection (memory)
-gc()
+
 # Multi core
 cl <- makeCluster(detectCores() - 1)
 registerDoParallel(cl, cores = detectCores() - 1)
 ```
 
 
-## About HC Corpora 
-
 The data is from a corpus called HC Corpora ([www.corpora.heliohost.org](www.corpora.heliohost.org)).
 See the readme file at [http://www.corpora.heliohost.org/aboutcorpus.html](http://www.corpora.heliohost.org/aboutcorpus.html) for details on the corpora available. The files have been language filtered but may still contain some foreign text.
 
-## Profanity Filtering
+**Overview the original data**
 
-As required by the project assignement, we should filter profanity words. We propose to use a standard list found online for this task.
+Once the assignment text data file is downloaded locally and unzipped, we don't load it directly in R as the file are very large. We first use system level commands to characterize the data. This is basic information and do not take into account any data cleaning (the command wc -w counts words as token separated by spaces).
 
-```{r getBadWords, message=FALSE, warning=FALSE, echo=TRUE, eval=TRUE, cache=FALSE}
-# http://www.bannedwordlist.com/lists/swearWords.txt"
-# another more detailled here : # from "https://www.cs.cmu.edu/~biglou/resources/bad-words.txt
-badWordsUrl <- "../../data/swearWords.txt"
-badWords <- read.csv(badWordsUrl,stringsAsFactors = FALSE)[,1]
-tail(badWords)
-```
-
-
-## Overview the original data
-
-Once the assignment text data file is downloaded localy and unziped, we don't load it directly in R as the file are very large. We first use system level commands to characterise the data. This is basic information and do not take into account any data cleaning (the command wc -w counts words as token separated by spaces).
-
-```{r overviewSystem, echo=TRUE, warning=FALSE, message=FALSE, cache=FALSE, eval=TRUE, results='asis'}
+```{r overviewSystem, echo=FALSE, warning=FALSE, message=FALSE, cache=FALSE, eval=TRUE, results='asis'}
 blogsFile <-"../../data/final/en_US/en_US.blogs.txt"
 newsFile <- "../../data/final/en_US/en_US.news.txt"
 twitterFile <- "../../data/final/en_US/en_US.twitter.txt"
@@ -137,42 +128,50 @@ summaryDf$nbLines <- as.numeric(summaryDf$nbLines)
 
 pandoc.table(summaryDf, style = "rmarkdown", split.table = Inf)
 
-tracker <- rbind(tracker, data.frame(operation = "Summarize Data (with wc)", time = Sys.time()))
+tracker <- rbind(tracker, data.frame(operation = "Summarize Data (with wc)", time = Sys.time(), free.ram.Mo = getRam()))
+```
+
+**Additionnal data for profanity Filtering**
+
+As required by the project assignment, we should filter profanity words. We propose to use a standard list found online for this task at [http://www.bannedwordlist.com/lists/swearWords.txt](http://www.bannedwordlist.com/lists/swearWords.txt).
+
+```{r getBadWords, message=FALSE, warning=FALSE, echo=FALSE, eval=TRUE, cache=FALSE}
+# http://www.bannedwordlist.com/lists/swearWords.txt"
+badWordsUrl <- "../../data/swearWords.txt"
+badWords <- read.csv(badWordsUrl,stringsAsFactors = FALSE)[,1]
+#tail(badWords)
+# Alternatively another more detailled here : # from "https://www.cs.cmu.edu/~biglou/resources/bad-words.txt
 ```
 
 
 
 
-## Read the files by Sampling
+# Create Sample from the initial data
 
-As the data set is very large, we reach the limit of RAM and computing very quickly, we decide to subset a random sample of the initial data to make the exploraroty analysis and build the model. We start with few % of each file to developp our full process and we will later iterate by increasing `sampleSize` to improve accuracy.
+As the data set is very large, we reach the limit of RAM and computing very quickly, we decide to subset a random sample of the initial data to make the exploratory analysis and build the model. We start with few % of each file to develop our full process and we will later iterate by increasing `sampleSize` to improve accuracy.
 
 
 ```{r loadData, message=FALSE, warning=FALSE, echo=TRUE, cache=FALSE, eval=TRUE}
 set.seed(1234)
-sampleSize <- c(0.01,0.01,0.01)
-
+sampleSize <- c(0.05,0.05,0.05)
+## Blogs data
 con <- file(blogsFile, "r") 
-blogsSample <- sample(
-        readLines(con, -1, skipNul = TRUE),
-        round(sampleSize[1]*summaryDf$nbLines[1]))
+blogsSample <- sample(readLines(con, -1, skipNul = TRUE), round(sampleSize[1]*summaryDf$nbLines[1]))
 close(con)
+## News data
 con <- file(newsFile, "r")
-newsSample <- sample(
-        readLines(con, -1, skipNul = TRUE), 
-        round(sampleSize[2]*summaryDf$nbLines[2]))
+newsSample <- sample(readLines(con, -1, skipNul = TRUE), round(sampleSize[2]*summaryDf$nbLines[2]))
 close(con) 
+## Twitter data
 con <- file(twitterFile , "r")
-twitterSample <- sample(
-        readLines(con, -1, skipNul = TRUE),
-        round(sampleSize[3]*summaryDf$nbLines[3]))
+twitterSample <- sample(readLines(con, -1, skipNul = TRUE), round(sampleSize[3]*summaryDf$nbLines[3]))
 close(con)
 
-tracker <- rbind(tracker, data.frame(operation = paste("Load Data Sample :", sampleSize), time = Sys.time()))
+tracker <- rbind(tracker, data.frame(operation = paste("Load Data Sample :", sampleSize), time = Sys.time(), free.ram.Mo = getRam()))
 rm(summaryDf)
 ```
 
-# Overview of the sampled data
+**Overview of the sampled data**
 
 ```{r overViewOfData, message=FALSE, warning=FALSE, eval=TRUE, cache=FALSE, echo=TRUE}
 tail(blogsSample,3)
@@ -180,33 +179,36 @@ tail(newsSample,3)
 tail(twitterSample,5)
 ```
 
+**About context**
 
-## Summary of the Sampled data with summary(corpus) from quanteda
+From these short extracts, it's pretty obvious that the context is very different between a blog, a news report and twitter. Using one or the other could lead in very different prediction as the vocabulary and style used is different depending on the context.
+
+
+# Summary of the Sampled data
 
 We use quanteda summary function on a corpus to analyse the key dimensions of our data Sample.
 
 ```{r summaryDatSetv2, message=FALSE, warning=FALSE, echo=TRUE, eval=TRUE, cache=FALSE}
 enSample <- corpus(
-        c(
-                blogsSample = paste(blogsSample, collapse = " "),
+        c(      blogsSample = paste(blogsSample, collapse = " "),
                 newsSample = paste(newsSample, collapse = " "),
-                twitterSample = paste(twitterSample, collapse = "")
-                )
-        )
-tracker <- rbind(tracker, data.frame(operation = "Create Corpus from Sample data", time = Sys.time()))
+                twitterSample = paste(twitterSample, collapse = "")))
+
+tracker <- rbind(tracker, data.frame(operation = "Create Corpus from Sample data", time = Sys.time(),free.ram.Mo = getRam()))
 ```
 
-```{r summaryDatSetv3, message=FALSE, warning=FALSE, echo=TRUE, eval=TRUE, cache=FALSE, results='asis'}
-summaryEnSample <- summary(enSample)
+```{r summaryDatSetv3, message=FALSE, warning=FALSE, echo=FALSE, eval=TRUE, cache=FALSE, results='asis'}
+## Sink the output message otherwise this generate messy text for Rmd
+{ sink("/dev/null"); summaryEnSample <- summary(enSample); sink(); }
 
 pandoc.table(summaryEnSample, style = "rmarkdown", split.table = Inf)
 
-tracker <- rbind(tracker, data.frame(operation = "Summarize Sample data - quanteda", time = Sys.time()))
+tracker <- rbind(tracker, data.frame(operation = "Summarize Sample data - quanteda", time = Sys.time(), free.ram.Mo = getRam()))
 ```
 
-The following plot helps to visualise the different text. Twitter texts have much more different Types (different words) than the News of Blogs data. This seems logical as using twitter, users are force to condense words and use hachtags, etc... Twitter text data base lines are much shorter which explains there are less tokens in this dataset than in the news or blogs one.
+The following plot helps to visualize the different text. Twitter texts have much more different Types (different words) than the News of Blogs data. This seems logical as using twitter, users are force to condense words and use hachtags, etc... Twitter text data base lines are much shorter which explains there are less tokens in this dataset than in the news or blogs one.
 
-```{r  graphCorpus, message=FALSE, warning=FALSE, echo=TRUE, eval=TRUE, cache=FALSE}
+```{r  graphCorpus, message=FALSE, warning=FALSE, echo=FALSE, eval=TRUE, cache=FALSE}
 ## Graphical summary
 g <- ggplot(data = summaryEnSample)
 g <- g + geom_point(aes(x = Tokens, y = Types, size = Sentences, col = Text))
@@ -216,7 +218,7 @@ g
 ```
 
 
-# Tokent extraction of english database with text2vec
+# Token extraction of english database with text2vec
 
 ## What is text2vec ?
 From https://github.com/dselivanov/text2vec
@@ -225,37 +227,74 @@ From https://github.com/dselivanov/text2vec
 
 ## Vocabulary based vectorization
 
-In order to do an exploratory analysis of the corpus and then build our prediction model, the first step is to vectorise the corpus. It means first to extract the different tokens and to compute their frequency in the 3 types of ressources.
+In order to do an exploratory analysis of the corpus and then build our prediction model, the first step is to vectorise the corpus. It means first to extract the different tokens and to compute their frequency in the 3 types of resources.
 
-### Steming, pre-processing and tokenizer function 
+**Build a re-processing and tokenizer function**
 
 First, we build a function to extract tokens for the text using a tokenizer and some preprocessing. For this intermediary report, we will use a limited amount of pre-processing :
 
 - convert text to lower case
-- remove english stopwords
+- remove numbers
+
+Then our tokenizer function includes :
+
+- 'untwitter' (remove hastags, RT, url), based on regular expressions
+- substitute English shorten words by long equivalents (I'm -> I am...)
+- remove all non alpha numeric English characters (keep quotes and hyphens)
 - remove bad words (profanity filtering)
 
-Some other filtering to be considered later to build the model :
+Some other filtering to be considered later to build the model, but not used at this stage :
 
 - Stemming ([wikipedia](https://en.wikipedia.org/wiki/Stemming) : A stemmer for English, for example, should identify the string "cats" (and possibly "catlike", "catty" etc.) as based on the root "cat", and "stems", "stemmer", "stemming", "stemmed" as based on "stem". A stemming algorithm reduces the words "fishing", "fished", and "fisher" to the root word, "fish".)
-- url filtering (remove all uri)
-- twitter filtering (how to deal with hashtags, etc..)
-- remove numbers ?
 
 
 ```{r text2vecTokenizer, message=FALSE, warning=FALSE, cache=FALSE, echo = TRUE, eval=TRUE}
+## Function to substitute english shorten sentences
+replaceShortEnglish <- function(t){
+        t <- gsub(pattern = "can't", replacement = " cannot", t)
+        t <- gsub(pattern = "'m", replacement = " am", t)
+        t <- gsub(pattern = "ain't", replacement = "am not", t)
+        t <- gsub(pattern = "'re", replacement = " are", t)
+        t <- gsub(pattern = "'ve", replacement = " have", t)
+        t <- gsub(pattern = "'d", replacement = " would", t)
+        t <- gsub(pattern = "'ll", replacement = " will", t)
+        t <- gsub(pattern = "n't", replacement = " not", t)
+        t <- gsub(pattern = "what's", replacement = "what is", t)
+        t <- gsub(pattern = "won't", replacement = "will not", t)
+        return(t)
+}
+## Function to clean twitter like content, url, RT and hastags
+untwitter <- function(t){
+        ## Remove URL
+        t <- gsub('http\\S+\\s*', '', t)
+        ## Remove hastags
+        t <- gsub('#\\S+\\s*', '', t)
+        # Remove "rt"
+        t <- gsub('\\brt\\b', '', t)
+        return(t)
+}
+## Function to remove all characters except english alphabetic and quotes, hypens
+cleanText <- function(t) {
+        t <- gsub("[^a-z -\\']", "", t)
+        return(t)
+}
+
+## Our tokenizer function
 stem_tokenizer <- function(v, tokenizer = word_tokenizer) {
-  v %>%
-    tokenizer 
+ 
+    v %>%
+            untwitter %>%
+            replaceShortEnglish %>%
+            cleanText %>%
+            tokenizer 
     # poerter stemmer
     #  %>% lapply(wordStem, 'en')
-    # Remove numbers ?
-    # %>% removeNumbers
 }
-sw <- c(stopwords("en"), badWords)
 ```
 
-We apply the stem_tokenizer function to our data set.
+**Apply preprocessing and tokenizer to our data**
+
+We apply the 'stem_tokenizer()' function to our data set (vector of the 3 collapse samples)
 
 ```{r text2vecMakeTokens, message=FALSE, warning=FALSE, cache=FALSE, echo = TRUE, eval=TRUE}
 tokens <- c(paste(blogsSample, collapse = " "),
@@ -263,136 +302,158 @@ tokens <- c(paste(blogsSample, collapse = " "),
             paste(twitterSample, collapse = "")
             ) %>%
         tolower %>%
+        removeNumbers %>%
         stem_tokenizer
-names(tokens) <- c("blogsSample", "newsSample", "twitter")
-
-
+names(tokens) <- c("blogsSample", "newsSample", "twitterSample")
 ```
 
-### Stopwords, bad words filtering
+**About stopwords, bad words filtering**
 
-Filtering the english stopwords and bad words will be required in the next steps. We prepare the merge list with the following code.
+Filtering the English stopwords and bad words will be required in the next steps. We prepare the merge list with the following code and prepare 'swC' vector to be pass through the token extraction function.
 
 ```{r text2vecBadWords, message=FALSE, warning=FALSE, cache=FALSE, echo = TRUE, eval=TRUE}
 ## stopwords are words like : c("i", "me", "my", "myself", "we", "our", "ours", "ourselves", "you", "your", "yours")
-swC <- c(stopwords("en"), 
-        badWords) 
-# here if we use stemming; we need also to stem stopwords, because stop-words filtering would be performed after tokenization!
+swC <- c(stopwords("en"), badWords) 
+# here if we would use stemming; we need also to stem stopwords, because stop-words filtering would be performed after tokenization!
 # %>% wordStem('en')
 ```
 
 
-## UniGrams
+## Build Uni-Grams
+
+We can build now the DTM of Uni-grams with the following code. We will obtain a matrix of 3 rows (one for each sample, blogs, news, twitter) and as many column as we have different tokens. Each cell contains the number of occurrence of the token in each text.
+
+To explore the data we sum the column to get the total occurrence of the tokens, we extract the top 1000 most frequent. We also extract the top 1000 for each row to have a analysis per type of documents.
 
 ```{r text2vecUniGrams, message=FALSE, warning=FALSE, cache=FALSE, echo = TRUE, eval=TRUE}
 ## Create the iterator on the tokens
-it <- itoken(tokens)
+it <- itoken(tokens, progessbar = FALSE)
 ## Generate the vocabulary using the iterator, 1-gram badwords / stopwords list.
 vocab1 <- create_vocabulary(it, ngram = c(ngram_min = 1L, ngram_max = 1L), stopwords = swC)
 
 ## We need to reinitialise iterator : it
-## Here we create dtm directly:
 it <- itoken(tokens)
+## Here we create dtm directly:
 v_vectorizer <- vocab_vectorizer(vocab1)
 dtm1 <- create_dtm(it, v_vectorizer)
-# check  that dtm keep documents names/ids as rownames
-rownames(dtm1)
 
 ## Save dtm1 R object
 save(dtm1, file = '../../data/Rda/dtm1.Rda')
 
-## Sum freq for each document / feature
+## Function which change a named vector of tokens to a sorted dataframe
+vector2TopDF <- function(v){
+        v <- v[order(v, decreasing = T)][1:1000]
+        v <- data.frame(features = names(v),
+                   freq = v, row.names = NULL)
+        v <- transform(v, features = reorder(features,freq))
+        ## Order factor by freq
+        v$features <-factor(v$features, levels=v[order(v$freq), "features"])
+        return(v)
+}
+
+## Extract the top 1000 most frequent concepts
 wordsFreq <- colSums(dtm1)
+top1 <- vector2TopDF(wordsFreq[order(wordsFreq, decreasing = T)][1:1000])
+## Extract the top 1000 most frequent concepts in blogs
+blogFreq <- dtm1[rownames(dtm1) == "blogsSample",]
+top1blogs <- vector2TopDF(blogFreq[order(blogFreq, decreasing = T)][1:1000])
+## Extract the top 1000 most frequent concepts in news
+newsFreq <- dtm1[rownames(dtm1) == "newsSample",]
+top1news <- vector2TopDF(newsFreq[order(newsFreq, decreasing = T)][1:1000])
+## Extract the top 1000 most frequent concepts in blogs
+twitterFreq <- dtm1[rownames(dtm1) == "twitterSample",]
+top1twitter <- vector2TopDF(twitterFreq[order(twitterFreq, decreasing = T)][1:1000])
 
-## Extract the top 100 most frequent concepts
-top1 <- wordsFreq[order(wordsFreq, decreasing = T)][1:100]
-top1 <- data.frame(features = names(top1),
-                   freq = top1, row.names = NULL)
-top1 <- transform( 
-        top1,
-        features = reorder(features,freq))
-## Order factor by freq
-top1$features <-factor(top1$features, levels=top1[order(top1$freq), "features"])
 
+## clean space
+rm(dtm1,vocab1)
+gg <- gc(reset = TRUE)
 
-tracker <- rbind(tracker, data.frame(operation = "Create Vocabulary / DTM Unigram - text2vec", time = Sys.time()))
+tracker <- rbind(tracker, data.frame(operation = "Create Vocabulary / DTM Unigram - text2vec", time = Sys.time(),free.ram.Mo = getRam()))
 ```
 
-## Bi Grams
+We obtain 4 vectors of the top 1000 tokens arranged by frequency in the texts. These will be visualized in the next section.
 
-```{r text2vecBiGrams, message=FALSE, warning=FALSE, cache=FALSE, echo = TRUE, eval=TRUE}
+## Bi Grams, Tri Grams
+
+We proceed the same way for the Bi-grams and Tri-grams. The code is similar except that we pass 'ngram = c(ngram_min = 2L, ngram_max = 2L)' and 'ngram = c(ngram_min = 3L, ngram_max = 3L)' to the vocabulary creation function for Bi-grams and Tri-grams.
+
+```{r text2vecBiGrams, message=FALSE, warning=FALSE, cache=FALSE, echo = FALSE, eval=TRUE}
 ## Create the iterator on the tokens
-it <- itoken(tokens)
+it <- itoken(tokens, progessbar = FALSE)
 ## Generate the vocabulary using the iterator, 1-gram badwords / stopwords list.
 vocab2 <- create_vocabulary(it, ngram = c(ngram_min = 2L, ngram_max = 2L), stopwords = swC)
 
 ## We need to reinitialise iterator : it
-## Here we create dtm directly:
 it <- itoken(tokens)
+## Here we create dtm directly:
 v_vectorizer <- vocab_vectorizer(vocab2)
 dtm2 <- create_dtm(it, v_vectorizer)
-# check  that dtm keep documents names/ids as rownames
-rownames(dtm2)
-object.size(dtm2) / 1024^2
 
-## Save dtm1 R object
+## Save dtm2 R object
 save(dtm2, file = '../../data/Rda/dtm2.Rda')
 
-## Sum freq for each document / feature
+## Extract the top 1000 most frequent concepts
 wordsFreq <- colSums(dtm2)
+top2 <- vector2TopDF(wordsFreq[order(wordsFreq, decreasing = T)][1:1000])
+## Extract the top 1000 most frequent concepts in blogs
+blogFreq <- dtm2[rownames(dtm2) == "blogsSample",]
+top2blogs <- vector2TopDF(blogFreq[order(blogFreq, decreasing = T)][1:1000])
+## Extract the top 1000 most frequent concepts in news
+newsFreq <- dtm2[rownames(dtm2) == "newsSample",]
+top2news <- vector2TopDF(newsFreq[order(newsFreq, decreasing = T)][1:1000])
+## Extract the top 1000 most frequent concepts in blogs
+twitterFreq <- dtm2[rownames(dtm2) == "twitterSample",]
+top2twitter <- vector2TopDF(twitterFreq[order(twitterFreq, decreasing = T)][1:1000])
 
-## Extract the top 100 most frequent concepts
-top2 <- wordsFreq[order(wordsFreq, decreasing = T)][1:100]
-top2 <- data.frame(features = names(top2),
-                   freq = top2, row.names = NULL)
-## Order factor by freq
-top2$features <-factor(top2$features, levels=top2[order(top2$freq), "features"])
+## clean space
+rm(dtm2,vocab2)
+gg <- gc(reset = TRUE)
 
 
-tracker <- rbind(tracker, data.frame(operation = "Create Vocabulary Bigram - text2vec", time = Sys.time()))
+tracker <- rbind(tracker, data.frame(operation = "Create Vocabulary Bigram - text2vec", time = Sys.time(),free.ram.Mo = getRam()))
 ```
 
-## Tri Grams
 
-```{r text2vecTriGrams, message=FALSE, warning=FALSE, cache=FALSE, echo = TRUE, eval=TRUE}
+```{r text2vecTriGrams, message=FALSE, warning=FALSE, cache=FALSE, echo = FALSE, eval=TRUE}
 ## Create the iterator on the tokens
-it <- itoken(tokens)
+it <- itoken(tokens, progessbar = FALSE)
 ## Generate the vocabulary using the iterator, 1-gram badwords / stopwords list.
 vocab3 <- create_vocabulary(it, ngram = c(ngram_min = 3L, ngram_max = 3L), stopwords = swC)
 
 ## We need to reinitialise iterator : it
-## Here we create dtm directly:
 it <- itoken(tokens)
+## Here we create dtm directly:
 v_vectorizer <- vocab_vectorizer(vocab3)
 dtm3 <- create_dtm(it, v_vectorizer)
-# check  that dtm keep documents names/ids as rownames
-rownames(dtm3)
-object.size(dtm3) / 1024^2
 
-## Save dtm1 R object
+## Save dtm3 R object
 save(dtm3, file = '../../data/Rda/dtm2.Rda')
 
-## Sum freq for each document / feature
+## Extract the top 1000 most frequent concepts
 wordsFreq <- colSums(dtm3)
+top3 <- vector2TopDF(wordsFreq[order(wordsFreq, decreasing = T)][1:1000])
+## Extract the top 1000 most frequent concepts in blogs
+blogFreq <- dtm3[rownames(dtm3) == "blogsSample",]
+top3blogs <- vector2TopDF(blogFreq[order(blogFreq, decreasing = T)][1:1000])
+## Extract the top 1000 most frequent concepts in news
+newsFreq <- dtm3[rownames(dtm3) == "newsSample",]
+top3news <- vector2TopDF(newsFreq[order(newsFreq, decreasing = T)][1:1000])
+## Extract the top 1000 most frequent concepts in blogs
+twitterFreq <- dtm3[rownames(dtm3) == "twitterSample",]
+top3twitter <- vector2TopDF(twitterFreq[order(twitterFreq, decreasing = T)][1:1000])
 
-## Extract the top 100 most frequent concepts
-top3 <- wordsFreq[order(wordsFreq, decreasing = T)][1:100]
-top3 <- data.frame(features = names(top3),
-                   freq = top3, row.names = NULL)
-## Order factor by freq
-top3$features <-factor(top3$features, levels=top3[order(top3$freq), "features"])
+## clean space
+rm(dtm3,vocab3)
+gg <- gc(reset = TRUE)
 
-
-
-tracker <- rbind(tracker, data.frame(operation = "Create Vocabulary Trigram - text2vec", time = Sys.time()))
-
+tracker <- rbind(tracker, data.frame(operation = "Create Vocabulary Trigram - text2vec", time = Sys.time(),free.ram.Mo = getRam()))
 ```
 
 # Exploratory Analysis
 
 ## Principles
 
-## Exploratory analysis
 The first step in building a predictive model for text is understanding the distribution and relationship between the words, tokens, and phrases in the text. The goal of this task is to understand the basic relationships you observe in the data and prepare to build your first linguistic models.
 
 Exploratory analysis - perform a thorough exploratory analysis of the data, understanding the distribution of words and relationship between the words in the corpora.
@@ -404,13 +465,14 @@ How many unique words do you need in a frequency sorted dictionary to cover 50% 
 How do you evaluate how many of the words come from foreign languages?
 Can you think of a way to increase the coverage -- identifying words that may not be in the corpora or using a smaller number of words in the dictionary to cover the same number of phrases?
 
-## Plotting Functions 
 
-```{r plotFunctions,  message=FALSE, warning=FALSE, echo=TRUE, eval=TRUE, cache=FALSE}
+```{r plotFunctions,  message=FALSE, warning=FALSE, echo=FALSE, eval=TRUE, cache=FALSE}
 plotFeatures <- function(featureDf) {
         g <- ggplot(data = featureDf)
         g <- g + geom_bar(aes(x = features, y = freq), stat = "identity")
         g <- g +  coord_flip()
+        g <- g + theme(axis.text.x = element_text(angle = 90, hjust = 1, size = rel(0.8)))
+        g <- g + theme(axis.text.y = element_text(size = rel(0.8)))
         g
 }
 ```
@@ -418,38 +480,104 @@ plotFeatures <- function(featureDf) {
 
 ## Exploring Uni-grams
 
-```{r wordCloudUni, message=FALSE, warning=FALSE, echo=TRUE, cache=FALSE, eval=TRUE}
+We first plot the wordclouds per type of texts.
+
+```{r wordCloudUni, message=FALSE, warning=FALSE, echo=FALSE, cache=FALSE, eval=TRUE}
 set.seed(1234)
-wordcloud::wordcloud(top1$features, top1$freq, colors = brewer.pal(6, "Dark2"), scale = c(4, .1))
+layout(matrix(c(1,2,3,4,5,6,7,8), 2, 4, byrow = TRUE),heights=c(1,1))
+par(mar=c(0,0,0,0))
+wordcloud::wordcloud(top1$features, top1$freq, colors = brewer.pal(6, "Dark2"), scale = c(4, .1), max.words = 200)
+wordcloud::wordcloud(top1blogs$features, top1blogs$freq, colors = brewer.pal(6, "Dark2"), scale = c(4, .1), max.words = 200)
+wordcloud::wordcloud(top1news$features, top1news$freq, colors = brewer.pal(6, "Dark2"), scale = c(4, .1), max.words = 200)
+wordcloud::wordcloud(top1twitter$features, top1twitter$freq, colors = brewer.pal(6, "Dark2"), scale = c(4, .1), max.words = 200)
+plot.new()
+text(x=0.5, y=1, "Unii-Grams Global")
+plot.new()
+text(x=0.5, y=1, "Uni-Grams Blogs")
+plot.new()
+text(x=0.5, y=1, "Uni-Grams News")
+plot.new()
+text(x=0.5, y=1, "Uni-Grams Twitter")
+
 ```
 
-```{r featurePlotUniGram, message=FALSE, warning=FALSE, echo=TRUE, cache=FALSE, eval=TRUE}
-plotFeatures(top1[1:30,])
+Let's plot now the histograms of frequency in the texts.
+
+```{r featurePlotUniGram, message=FALSE, warning=FALSE, echo=FALSE, cache=FALSE, eval=TRUE}
+require(gridExtra)
+plot1 <- plotFeatures(top1[1:30,]) + ggtitle("Total")
+plot2 <- plotFeatures(top1blogs[1:30,]) + ggtitle("Blogs")
+plot3 <- plotFeatures(top1news[1:30,]) + ggtitle("News")
+plot4 <- plotFeatures(top1twitter[1:30,]) + ggtitle("Twitter")
+grid.arrange(plot1, plot2, plot3, plot4, ncol=4)
+
 ```
 
 ## Exploring BiGrams
 
+We first plot the wordclouds per type of texts.
 
-```{r wordCloudBiGram, message=FALSE, warning=FALSE, echo=TRUE, cache=FALSE, eval=TRUE}
+```{r wordCloudBiGram, message=FALSE, warning=FALSE, echo=FALSE, cache=FALSE, eval=TRUE}
 set.seed(1234)
-wordcloud::wordcloud(top2$features, top2$freq, colors = brewer.pal(6, "Dark2"), scale = c(2, .1))
+layout(matrix(c(1,2,3,4,5,6,7,8), 2, 4, byrow = TRUE),heights=c(1,1))
+par(mar=c(0,0,0,0))
+wordcloud::wordcloud(top2$features, top2$freq, colors = brewer.pal(6, "Dark2"), scale = c(4, .1), max.words = 200)
+wordcloud::wordcloud(top2blogs$features, top2blogs$freq, colors = brewer.pal(6, "Dark2"), scale = c(4, .1), max.words = 200)
+wordcloud::wordcloud(top2news$features, top2news$freq, colors = brewer.pal(6, "Dark2"), scale = c(4, .1), max.words = 200)
+wordcloud::wordcloud(top2twitter$features, top2twitter$freq, colors = brewer.pal(6, "Dark2"), scale = c(4, .1), max.words = 200)
+plot.new()
+text(x=0.5, y=1, "Bi-Grams Global")
+plot.new()
+text(x=0.5, y=1, "Bi-Grams Blogs")
+plot.new()
+text(x=0.5, y=1, "Bi-Grams News")
+plot.new()
+text(x=0.5, y=1, "Bi-Grams Twitter")
 ```
 
-```{r featurePlotBiGram, message=FALSE, warning=FALSE, echo=TRUE, cache=FALSE, eval=TRUE}
-plotFeatures(top2[1:30,])
+Let's plot now the histograms of frequency in the texts.
+
+```{r featurePlotBiGram, message=FALSE, warning=FALSE, echo=FALSE, cache=FALSE, eval=TRUE}
+require(gridExtra)
+plot1 <- plotFeatures(top2[1:30,]) + ggtitle("Total")
+plot2 <- plotFeatures(top2blogs[1:30,]) + ggtitle("Blogs")
+plot3 <- plotFeatures(top2news[1:30,]) + ggtitle("News")
+plot4 <- plotFeatures(top2twitter[1:30,]) + ggtitle("Twitter")
+grid.arrange(plot1, plot2, plot3, plot4, ncol=4)
 ```
 
 
 ## Exploring TriGrams
 
+We first plot the wordclouds per type of texts.
 
-```{r wordCloudTriGram, message=FALSE, warning=FALSE, echo=TRUE, cache=FALSE, eval=TRUE}
+```{r wordCloudTriGram, message=FALSE, warning=FALSE, echo=FALSE, cache=FALSE, eval=TRUE}
 set.seed(1234)
-wordcloud::wordcloud(top3$features, top2$freq, colors = brewer.pal(6, "Dark2"), scale = c(2, .1))
+layout(matrix(c(1,2,3,4,5,6,7,8), 2, 4, byrow = TRUE),heights=c(1,1))
+par(mar=c(0,0,0,0))
+wordcloud::wordcloud(top3$features, top3$freq, colors = brewer.pal(6, "Dark2"), scale = c(4, .1), max.words = 200)
+wordcloud::wordcloud(top3blogs$features, top3blogs$freq, colors = brewer.pal(6, "Dark2"), scale = c(4, .1), max.words = 200)
+wordcloud::wordcloud(top3news$features, top3news$freq, colors = brewer.pal(6, "Dark2"), scale = c(4, .1), max.words = 200)
+wordcloud::wordcloud(top3twitter$features, top3twitter$freq, colors = brewer.pal(6, "Dark2"), scale = c(4, .1), max.words = 200)
+plot.new()
+text(x=0.5, y=1, "Tri-Grams Global")
+plot.new()
+text(x=0.5, y=1, "Tri-Grams Blogs")
+plot.new()
+text(x=0.5, y=1, "Tri-Grams News")
+plot.new()
+text(x=0.5, y=1, "Tri-Grams Twitter")
 ```
 
-```{r featurePlotTriGram, message=FALSE, warning=FALSE, echo=TRUE, cache=FALSE, eval=TRUE}
-plotFeatures(top3[1:30,])
+Let's plot now the histograms of frequency in the texts.
+
+```{r featurePlotTriGram, message=FALSE, warning=FALSE, echo=FALSE, cache=FALSE, eval=TRUE}
+require(gridExtra)
+plot1 <- plotFeatures(top3[1:30,]) + ggtitle("Total")
+plot2 <- plotFeatures(top3blogs[1:30,]) + ggtitle("Blogs")
+plot3 <- plotFeatures(top3news[1:30,]) + ggtitle("News")
+plot4 <- plotFeatures(top3twitter[1:30,]) + ggtitle("Twitter")
+grid.arrange(plot1, plot2, plot3, plot4, ncol=4)
 ```
 
 
@@ -459,21 +587,33 @@ plotFeatures(top3[1:30,])
 
 ## Processing time
 
-```{r processingDuration, message=FALSE, warning=FALSE, echo=TRUE, eval=TRUE, cache=FALSE, results='asis'}
+```{r processingDuration, message=FALSE, warning=FALSE, echo=FALSE, eval=TRUE, cache=FALSE, results='asis'}
 tracker$op.duration <- round(c(0,(tracker[2:nrow(tracker),]$time - tracker[1:(nrow(tracker)-1),]$time)),1)
 tracker$total.duration <- round(tracker$time - tracker[1,]$time,1)
+tracker$total.duration.min <- round(tracker$total.duration / 60,1)
 pandoc.table(tracker, style = "rmarkdown", split.table = Inf)
 ```
 
+```{r listObjects, echo=FALSE, eval=FALSE}
+myObjects <- ls()
+mySize <- vector()
+for (i in 1:length(myObjects)){
+        mySize <- c(mySize,object.size(get(myObjects[i]))/1024^2)
+}
+myObjects <- data.frame(myObjects = myObjects, size = mySize)
+myObjects <- arrange(myObjects, -size)
 
-# Approacha for prediction
+pandoc.table(myObjects, style = "rmarkdown", split.table = Inf)
+```
+
 
 
 # Conclusion
-```{r}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 stopCluster(cl)
 ```
 
+http://rpubs.com/longwei66/word-predictor-exploratory-analysis
 
 # References
 
@@ -483,3 +623,15 @@ Review Criteria :
 - Has the data scientist done basic summaries of the three files? Word counts, line counts and basic data tables?
 - Has the data scientist made basic plots, such as histograms to illustrate features of the data?
 - Was the report written in a brief, concise style, in a way that a non-data scientist manager could appreciate?
+
+
+**Notes**
+
+Explain only the major features of the data you have identified and briefly summarize your plans for creating the prediction algorithm and Shiny app in a way that would be understandable to a non-data scientist manager. 
+
+The motivation for this project is to: 
+
+1. Demonstrate that you've downloaded the data and have successfully loaded it in.
+2. Create a basic report of summary statistics about the data sets.
+3. Report any interesting findings that you amassed so far.
+4. Get feedback on your plans for creating a prediction algorithm and Shiny app. 
