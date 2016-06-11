@@ -30,8 +30,13 @@ This intermediary report covers point 1 to 5, focusing on exploratory analysis. 
 
 **Tokenization and DTM matrices**
 
-Put here an explanation about what it is.
+A DTM is a Document-term matrix (see [wikipedia](https://en.wikipedia.org/wiki/Document-term_matrix).
 
+> A document-term matrix or term-document matrix is a mathematical matrix that describes the frequency of terms that occur in a collection of documents. In a document-term matrix, rows correspond to documents in the collection and columns correspond to terms. There are various schemes for determining the value that each entry in the
+
+In this analysis, we will extract the terms from a sample of the original texts, terms will be either one world or a sentence of 2 or 3 consecutive words, these a called [n-grams](https://en.wikipedia.org/wiki/N-gram) (N from 1 to 3 in this report). We will use one of text mining package of R to build such matrix.
+
+We will use frequency of terms to build simple visualization for exploratory analysis.
 
 **About context**
 
@@ -67,7 +72,7 @@ getRam <- function() {
 
 # Load Libraries
 library(data.table); library(R.utils); library(dplyr)
-library(ggplot2); library(RColorBrewer); library(pander)
+library(ggplot2); library(RColorBrewer); library(pander);library(gridExtra)
 # For Parallele Computing
 library("parallel"); library("foreach"); library("doParallel")
 
@@ -148,12 +153,12 @@ badWords <- read.csv(badWordsUrl,stringsAsFactors = FALSE)[,1]
 
 # Create Sample from the initial data
 
-As the data set is very large, we reach the limit of RAM and computing very quickly, we decide to subset a random sample of the initial data to make the exploratory analysis and build the model. We start with few % of each file to develop our full process and we will later iterate by increasing `sampleSize` to improve accuracy.
+As the data set is very large, we reach the limit of RAM and computing very quickly, we decide to subset a random sample of the initial data to make the exploratory analysis and build the model. We started with few % of each file to develop our full process and we propose here 30% for `sampleSize` to improve accuracy.
 
 
 ```{r loadData, message=FALSE, warning=FALSE, echo=TRUE, cache=FALSE, eval=TRUE}
 set.seed(1234)
-sampleSize <- c(0.05,0.05,0.05)
+sampleSize <- c(0.3,0.3,0.3)
 ## Blogs data
 con <- file(blogsFile, "r") 
 blogsSample <- sample(readLines(con, -1, skipNul = TRUE), round(sampleSize[1]*summaryDf$nbLines[1]))
@@ -271,6 +276,8 @@ untwitter <- function(t){
         t <- gsub('#\\S+\\s*', '', t)
         # Remove "rt"
         t <- gsub('\\brt\\b', '', t)
+        # Remove "rt"
+        t <- gsub('\\bu\\b', ' you ', t)
         return(t)
 }
 ## Function to remove all characters except english alphabetic and quotes, hypens
@@ -335,7 +342,7 @@ vocab1 <- create_vocabulary(it, ngram = c(ngram_min = 1L, ngram_max = 1L), stopw
 it <- itoken(tokens)
 ## Here we create dtm directly:
 v_vectorizer <- vocab_vectorizer(vocab1)
-dtm1 <- create_dtm(it, v_vectorizer)
+{ sink("/dev/null"); dtm1 <- create_dtm(it, v_vectorizer); sink()}
 
 ## Save dtm1 R object
 save(dtm1, file = '../../data/Rda/dtm1.Rda')
@@ -388,7 +395,7 @@ vocab2 <- create_vocabulary(it, ngram = c(ngram_min = 2L, ngram_max = 2L), stopw
 it <- itoken(tokens)
 ## Here we create dtm directly:
 v_vectorizer <- vocab_vectorizer(vocab2)
-dtm2 <- create_dtm(it, v_vectorizer)
+{ sink("/dev/null"); dtm2 <- create_dtm(it, v_vectorizer); sink()}
 
 ## Save dtm2 R object
 save(dtm2, file = '../../data/Rda/dtm2.Rda')
@@ -425,7 +432,7 @@ vocab3 <- create_vocabulary(it, ngram = c(ngram_min = 3L, ngram_max = 3L), stopw
 it <- itoken(tokens)
 ## Here we create dtm directly:
 v_vectorizer <- vocab_vectorizer(vocab3)
-dtm3 <- create_dtm(it, v_vectorizer)
+{ sink("/dev/null"); dtm3 <- create_dtm(it, v_vectorizer); sink()}
 
 ## Save dtm3 R object
 save(dtm3, file = '../../data/Rda/dtm2.Rda')
@@ -467,12 +474,12 @@ Can you think of a way to increase the coverage -- identifying words that may no
 
 
 ```{r plotFunctions,  message=FALSE, warning=FALSE, echo=FALSE, eval=TRUE, cache=FALSE}
-plotFeatures <- function(featureDf) {
+plotFeatures <- function(featureDf, col = "blue") {
         g <- ggplot(data = featureDf)
-        g <- g + geom_bar(aes(x = features, y = freq), stat = "identity")
+        g <- g + geom_bar(aes(x = features, y = freq), stat = "identity", fill = col)
         g <- g +  coord_flip()
         g <- g + theme(axis.text.x = element_text(angle = 90, hjust = 1, size = rel(0.8)))
-        g <- g + theme(axis.text.y = element_text(size = rel(0.8)))
+        g <- g + theme(axis.text.y = element_text(size = rel(0.6)))
         g
 }
 ```
@@ -484,31 +491,30 @@ We first plot the wordclouds per type of texts.
 
 ```{r wordCloudUni, message=FALSE, warning=FALSE, echo=FALSE, cache=FALSE, eval=TRUE}
 set.seed(1234)
-layout(matrix(c(1,2,3,4,5,6,7,8), 2, 4, byrow = TRUE),heights=c(1,1))
+layout(matrix(c(1,2,5,6,3,4,7,8), 4, 2, byrow = TRUE),heights=c(4,1,4,1))
 par(mar=c(0,0,0,0))
-wordcloud::wordcloud(top1$features, top1$freq, colors = brewer.pal(6, "Dark2"), scale = c(4, .1), max.words = 200)
-wordcloud::wordcloud(top1blogs$features, top1blogs$freq, colors = brewer.pal(6, "Dark2"), scale = c(4, .1), max.words = 200)
-wordcloud::wordcloud(top1news$features, top1news$freq, colors = brewer.pal(6, "Dark2"), scale = c(4, .1), max.words = 200)
-wordcloud::wordcloud(top1twitter$features, top1twitter$freq, colors = brewer.pal(6, "Dark2"), scale = c(4, .1), max.words = 200)
+wordcloud::wordcloud(top1$features, top1$freq, colors = brewer.pal(6, "Dark2"), scale = c(3, .1), max.words = 100)
+wordcloud::wordcloud(top1blogs$features, top1blogs$freq, colors = brewer.pal(6, "Dark2"), scale = c(3, .1), max.words = 100)
+wordcloud::wordcloud(top1news$features, top1news$freq, colors = brewer.pal(6, "Dark2"), scale = c(3, .1), max.words = 100)
+wordcloud::wordcloud(top1twitter$features, top1twitter$freq, colors = brewer.pal(6, "Dark2"), scale = c(3, .1), max.words = 100)
 plot.new()
-text(x=0.5, y=1, "Unii-Grams Global")
+text(x=0.5, y=0.5, "Uni-Grams Global")
 plot.new()
-text(x=0.5, y=1, "Uni-Grams Blogs")
+text(x=0.5, y=0.5, "Uni-Grams Blogs")
 plot.new()
-text(x=0.5, y=1, "Uni-Grams News")
+text(x=0.5, y=0.5, "Uni-Grams News")
 plot.new()
-text(x=0.5, y=1, "Uni-Grams Twitter")
+text(x=0.5, y=0.5, "Uni-Grams Twitter")
 
 ```
 
-Let's plot now the histograms of frequency in the texts.
+Let's plot now the histograms of frequency in the texts. 
 
 ```{r featurePlotUniGram, message=FALSE, warning=FALSE, echo=FALSE, cache=FALSE, eval=TRUE}
-require(gridExtra)
-plot1 <- plotFeatures(top1[1:30,]) + ggtitle("Total")
-plot2 <- plotFeatures(top1blogs[1:30,]) + ggtitle("Blogs")
-plot3 <- plotFeatures(top1news[1:30,]) + ggtitle("News")
-plot4 <- plotFeatures(top1twitter[1:30,]) + ggtitle("Twitter")
+plot1 <- plotFeatures(top1[1:30,], col = "darkgreen") + ggtitle("Total")
+plot2 <- plotFeatures(top1blogs[1:30,], col = "firebrick") + ggtitle("Blogs")
+plot3 <- plotFeatures(top1news[1:30,], col = "purple") + ggtitle("News")
+plot4 <- plotFeatures(top1twitter[1:30,], col = "lightblue") + ggtitle("Twitter")
 grid.arrange(plot1, plot2, plot3, plot4, ncol=4)
 
 ```
@@ -519,30 +525,29 @@ We first plot the wordclouds per type of texts.
 
 ```{r wordCloudBiGram, message=FALSE, warning=FALSE, echo=FALSE, cache=FALSE, eval=TRUE}
 set.seed(1234)
-layout(matrix(c(1,2,3,4,5,6,7,8), 2, 4, byrow = TRUE),heights=c(1,1))
+layout(matrix(c(1,2,5,6,3,4,7,8), 4, 2, byrow = TRUE),heights=c(3,1,3,1))
 par(mar=c(0,0,0,0))
-wordcloud::wordcloud(top2$features, top2$freq, colors = brewer.pal(6, "Dark2"), scale = c(4, .1), max.words = 200)
-wordcloud::wordcloud(top2blogs$features, top2blogs$freq, colors = brewer.pal(6, "Dark2"), scale = c(4, .1), max.words = 200)
-wordcloud::wordcloud(top2news$features, top2news$freq, colors = brewer.pal(6, "Dark2"), scale = c(4, .1), max.words = 200)
-wordcloud::wordcloud(top2twitter$features, top2twitter$freq, colors = brewer.pal(6, "Dark2"), scale = c(4, .1), max.words = 200)
+wordcloud::wordcloud(top2$features, top2$freq, colors = brewer.pal(6, "Dark2"), scale = c(3, .1), max.words = 200)
+wordcloud::wordcloud(top2blogs$features, top2blogs$freq, colors = brewer.pal(6, "Dark2"), scale = c(3, .1), max.words = 200)
+wordcloud::wordcloud(top2news$features, top2news$freq, colors = brewer.pal(6, "Dark2"), scale = c(3, .1), max.words = 200)
+wordcloud::wordcloud(top2twitter$features, top2twitter$freq, colors = brewer.pal(6, "Dark2"), scale = c(3, .1), max.words = 200)
 plot.new()
-text(x=0.5, y=1, "Bi-Grams Global")
+text(x=0.5, y=0.5, "Bi-Grams Global")
 plot.new()
-text(x=0.5, y=1, "Bi-Grams Blogs")
+text(x=0.5, y=0.5, "Bi-Grams Blogs")
 plot.new()
-text(x=0.5, y=1, "Bi-Grams News")
+text(x=0.5, y=0.5, "Bi-Grams News")
 plot.new()
-text(x=0.5, y=1, "Bi-Grams Twitter")
+text(x=0.5, y=0.5, "Bi-Grams Twitter")
 ```
 
 Let's plot now the histograms of frequency in the texts.
 
 ```{r featurePlotBiGram, message=FALSE, warning=FALSE, echo=FALSE, cache=FALSE, eval=TRUE}
-require(gridExtra)
-plot1 <- plotFeatures(top2[1:30,]) + ggtitle("Total")
-plot2 <- plotFeatures(top2blogs[1:30,]) + ggtitle("Blogs")
-plot3 <- plotFeatures(top2news[1:30,]) + ggtitle("News")
-plot4 <- plotFeatures(top2twitter[1:30,]) + ggtitle("Twitter")
+plot1 <- plotFeatures(top2[1:30,], col = "darkgreen") + ggtitle("Total")
+plot2 <- plotFeatures(top2blogs[1:30,], col = "firebrick") + ggtitle("Blogs")
+plot3 <- plotFeatures(top2news[1:30,], col = "purple") + ggtitle("News")
+plot4 <- plotFeatures(top2twitter[1:30,], col = "lightblue") + ggtitle("Twitter")
 grid.arrange(plot1, plot2, plot3, plot4, ncol=4)
 ```
 
@@ -553,39 +558,54 @@ We first plot the wordclouds per type of texts.
 
 ```{r wordCloudTriGram, message=FALSE, warning=FALSE, echo=FALSE, cache=FALSE, eval=TRUE}
 set.seed(1234)
-layout(matrix(c(1,2,3,4,5,6,7,8), 2, 4, byrow = TRUE),heights=c(1,1))
+layout(matrix(c(1,2,5,6,3,4,7,8), 4, 2, byrow = TRUE),heights=c(3,1,3,1))
 par(mar=c(0,0,0,0))
-wordcloud::wordcloud(top3$features, top3$freq, colors = brewer.pal(6, "Dark2"), scale = c(4, .1), max.words = 200)
-wordcloud::wordcloud(top3blogs$features, top3blogs$freq, colors = brewer.pal(6, "Dark2"), scale = c(4, .1), max.words = 200)
-wordcloud::wordcloud(top3news$features, top3news$freq, colors = brewer.pal(6, "Dark2"), scale = c(4, .1), max.words = 200)
-wordcloud::wordcloud(top3twitter$features, top3twitter$freq, colors = brewer.pal(6, "Dark2"), scale = c(4, .1), max.words = 200)
+wordcloud::wordcloud(top3$features, top3$freq, colors = brewer.pal(6, "Dark2"), scale = c(1.5, .1), max.words = 200)
+wordcloud::wordcloud(top3blogs$features, top3blogs$freq, colors = brewer.pal(6, "Dark2"), scale = c(1.5, .1), max.words = 100)
+wordcloud::wordcloud(top3news$features, top3news$freq, colors = brewer.pal(6, "Dark2"), scale = c(1.5, .1), max.words = 100)
+wordcloud::wordcloud(top3twitter$features, top3twitter$freq, colors = brewer.pal(6, "Dark2"), scale = c(1.5, .1), max.words = 100)
 plot.new()
-text(x=0.5, y=1, "Tri-Grams Global")
+text(x=0.5, y=0.5, "Tri-Grams Global")
 plot.new()
-text(x=0.5, y=1, "Tri-Grams Blogs")
+text(x=0.5, y=0.5, "Tri-Grams Blogs")
 plot.new()
-text(x=0.5, y=1, "Tri-Grams News")
+text(x=0.5, y=0.5, "Tri-Grams News")
 plot.new()
-text(x=0.5, y=1, "Tri-Grams Twitter")
+text(x=0.5, y=0.5, "Tri-Grams Twitter")
 ```
 
 Let's plot now the histograms of frequency in the texts.
 
 ```{r featurePlotTriGram, message=FALSE, warning=FALSE, echo=FALSE, cache=FALSE, eval=TRUE}
-require(gridExtra)
-plot1 <- plotFeatures(top3[1:30,]) + ggtitle("Total")
-plot2 <- plotFeatures(top3blogs[1:30,]) + ggtitle("Blogs")
-plot3 <- plotFeatures(top3news[1:30,]) + ggtitle("News")
-plot4 <- plotFeatures(top3twitter[1:30,]) + ggtitle("Twitter")
+plot1 <- plotFeatures(top3[1:30,], col = "darkgreen") + ggtitle("Total")
+plot2 <- plotFeatures(top3blogs[1:30,], col = "firebrick") + ggtitle("Blogs")
+plot3 <- plotFeatures(top3news[1:30,], col = "purple") + ggtitle("News")
+plot4 <- plotFeatures(top3twitter[1:30,], col = "lightblue") + ggtitle("Twitter")
 grid.arrange(plot1, plot2, plot3, plot4, ncol=4)
 ```
+
+# Conclusion and next steps
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+stopCluster(cl)
+```
+
+The top tokens extracted for each 3 type of texts looks logical. Whether they are uni-grams, bi-grams or tri-grams. News are logically more informative with terms referring to the past and descriptive (dates, location, names), twitter with emotions and instruction (eg. please follow), Blogs are in the story telling mode. Overall the global merged seems to make sense.
+
+In the next steps of the project we will :
+
+1. continue to check and clean the data
+2. optimize the n-gram model using hashing to use less memory and remove probably terms which have a very low occurrence to save space
+3. Build the prediction model using Markov chains principles (check the probability on the next word based on the previous one) by looking in the n-gram data.
+4. Build the shiny app which integrate model and an interface for prediction.
+
+- 
 
 
 
 
 # Appendix
 
-## Processing time
+**Processing time & Memory**
 
 ```{r processingDuration, message=FALSE, warning=FALSE, echo=FALSE, eval=TRUE, cache=FALSE, results='asis'}
 tracker$op.duration <- round(c(0,(tracker[2:nrow(tracker),]$time - tracker[1:(nrow(tracker)-1),]$time)),1)
@@ -606,32 +626,6 @@ myObjects <- arrange(myObjects, -size)
 pandoc.table(myObjects, style = "rmarkdown", split.table = Inf)
 ```
 
+**References**
 
-
-# Conclusion
-```{r echo=FALSE, message=FALSE, warning=FALSE}
-stopCluster(cl)
-```
-
-http://rpubs.com/longwei66/word-predictor-exploratory-analysis
-
-# References
-
-Review Criteria :
-
-- Does the link lead to an HTML page describing the exploratory analysis of the training data set?
-- Has the data scientist done basic summaries of the three files? Word counts, line counts and basic data tables?
-- Has the data scientist made basic plots, such as histograms to illustrate features of the data?
-- Was the report written in a brief, concise style, in a way that a non-data scientist manager could appreciate?
-
-
-**Notes**
-
-Explain only the major features of the data you have identified and briefly summarize your plans for creating the prediction algorithm and Shiny app in a way that would be understandable to a non-data scientist manager. 
-
-The motivation for this project is to: 
-
-1. Demonstrate that you've downloaded the data and have successfully loaded it in.
-2. Create a basic report of summary statistics about the data sets.
-3. Report any interesting findings that you amassed so far.
-4. Get feedback on your plans for creating a prediction algorithm and Shiny app. 
+This report is available on rpubs [http://rpubs.com/longwei66/word-predictor-exploratory-analysis](http://rpubs.com/longwei66/word-predictor-exploratory-analysis)
