@@ -158,7 +158,8 @@ As the data set is very large, we reach the limit of RAM and computing very quic
 
 ```{r loadData, message=FALSE, warning=FALSE, echo=TRUE, cache=FALSE, eval=TRUE}
 set.seed(1234)
-sampleSize <- c(0.3,0.3,0.3)
+sampleSizeM <- 0.3
+sampleSize <- c(1,1,1) * sampleSizeM
 ## Blogs data
 con <- file(blogsFile, "r") 
 blogsSample <- sample(readLines(con, -1, skipNul = TRUE), round(sampleSize[1]*summaryDf$nbLines[1]))
@@ -197,7 +198,7 @@ We use quanteda summary function on a corpus to analyse the key dimensions of ou
 enSample <- corpus(
         c(      blogsSample = paste(blogsSample, collapse = " "),
                 newsSample = paste(newsSample, collapse = " "),
-                twitterSample = paste(twitterSample, collapse = "")))
+                twitterSample = paste(twitterSample, collapse = " ")))
 
 tracker <- rbind(tracker, data.frame(operation = "Create Corpus from Sample data", time = Sys.time(),free.ram.Mo = getRam()))
 ```
@@ -345,7 +346,7 @@ v_vectorizer <- vocab_vectorizer(vocab1)
 { sink("/dev/null"); dtm1 <- create_dtm(it, v_vectorizer); sink()}
 
 ## Save dtm1 R object
-save(dtm1, file = '../../data/Rda/dtm1.Rda')
+save(dtm1, file = paste('../../data/Rda/dtm1_', sampleSizeM,'.Rda', sep = ''))
 
 ## Function which change a named vector of tokens to a sorted dataframe
 vector2TopDF <- function(v){
@@ -398,7 +399,7 @@ v_vectorizer <- vocab_vectorizer(vocab2)
 { sink("/dev/null"); dtm2 <- create_dtm(it, v_vectorizer); sink()}
 
 ## Save dtm2 R object
-save(dtm2, file = '../../data/Rda/dtm2.Rda')
+save(dtm2, file = paste('../../data/Rda/dtm2_', sampleSizeM,'.Rda', sep = ''))
 
 ## Extract the top 1000 most frequent concepts
 wordsFreq <- colSums(dtm2)
@@ -435,7 +436,7 @@ v_vectorizer <- vocab_vectorizer(vocab3)
 { sink("/dev/null"); dtm3 <- create_dtm(it, v_vectorizer); sink()}
 
 ## Save dtm3 R object
-save(dtm3, file = '../../data/Rda/dtm2.Rda')
+save(dtm3, file = paste('../../data/Rda/dtm3_', sampleSizeM,'.Rda', sep = ''))
 
 ## Extract the top 1000 most frequent concepts
 wordsFreq <- colSums(dtm3)
