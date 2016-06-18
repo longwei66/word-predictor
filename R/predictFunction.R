@@ -19,17 +19,17 @@ predictNextWord <- function(inputText, ngramModel, myBadWords, removeSW = TRUE){
         ## Look for matching quad grams
         q4 <- myModel[(index == gr$myTriGram & type == 4), ]
         cnt <- countMyToken(myGram = gr$myInput[1], ngramModel, 3)
-        q4[,freq := freq / cnt]
+        q4[,freq := as.integer(round(freq / cnt * 100,0))]
         
         ## Look for matching tri grams
         q3 <- myModel[(index == gr$myBiGram & type == 3), ]
         cnt <- countMyToken(myGram = gr$myInput[2], ngramModel, 2)
-        q3[,freq := freq / cnt * 0.4]
+        q3[,freq := as.integer(round(freq / cnt * 0.4 *100))]
         
         ## Look for matching bii grams
         q2 <- myModel[(index == gr$myUniGram & type == 2), ]
         cnt <- countMyToken(myGram = gr$myInput[3], ngramModel, 1)
-        q2[,freq := freq / cnt * 0.4]
+        q2[,freq := as.integer(round(freq / cnt * 0.4 * 0.4 *100))]
         
         ## Look for matching unigram
         q1 <- myModel[(index == gr$myUniGram & type == 1), ]
@@ -40,11 +40,18 @@ predictNextWord <- function(inputText, ngramModel, myBadWords, removeSW = TRUE){
                 q3 <- q3[!(token %in% sw), ]
                 q2 <- q2[!(token %in% sw), ]
         } 
+        answer  <- rbindlist(list(q4,q3,q2))
+        answer[, c("index", "type") := NULL]
+        answer <- answer[,.(freq.Sum = sum(freq)),by=token]
+        
+        
+        # answer[,.(prob = sum(freq)), by = token]
         return(list(
                 gr = gr,
                 q4 = q4,
                 q3 = q3,
                 q2 = q2,
-                q1 = q1
+                q1 = q1,
+                answer = answer
         ))
 }

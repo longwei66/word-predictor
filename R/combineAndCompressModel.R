@@ -186,3 +186,4 @@ save(myModel, file = '../Models/modelCompact_0.7.Rda')
 # 12974637:          at    7    4  302397908
 # 12974638:      viewed    7    4  475301257
 
+load(file = '../Models/modelCompact_0.7.Rda')
