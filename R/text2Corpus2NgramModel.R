@@ -13,7 +13,7 @@
 ##      IV. 1-Grams
 ##      V. 2-Grams
 ##      VI. 3-Grams
-##
+##      VII. 4-Grams
 ## -----------------------------------------------------------------------------
 
 
@@ -21,20 +21,36 @@
 ## =============================================================================
 ##      I. Libs and configuration
 ## =============================================================================
-
 # Clear objects in memory
 rm(list = ls(all=TRUE))
+setwd('./R/')
 
 # Garbage collection (memory)
 gg <- gc(reset = TRUE)
 
 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#       MAIN CONFIGURATION
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Configuration of the Sample Size
 sampleSizeM <- 0.05
 sampleSize <- c(
         blogs = 1,
         news = 1,
         twitter = 1) * sampleSizeM
+
+# Configuration of stop words 
+stopWordsAction <- "included" # other choice : removedFull, included, removedShort 
+
+# Filter bellow minFreq
+minFreq <- c(
+        0, # for unigram
+        0, # for bigrams
+        0, # for trigrmas
+        0 # for quadgrams
+)
+
+
 
 
 # Function to get remaining RAM
@@ -112,15 +128,15 @@ set.seed(1234)
 
 ## Blogs data
 con <- file(blogsFile, "r") 
-blogsSample <- sample(readLines(con, -1, skipNul = TRUE), round(sampleSize["blogs"]*nbLines["blogs"]))
+blogsSample <- sample(readLines(con, -1, skipNul = TRUE, encoding = 'UTF8'), round(sampleSize["blogs"]*nbLines["blogs"]))
 close(con)
 ## News data
 con <- file(newsFile, "r")
-newsSample <- sample(readLines(con, -1, skipNul = TRUE), round(sampleSize["news"]*nbLines["news"]))
+newsSample <- sample(readLines(con, -1, skipNul = TRUE, encoding = 'UTF8'), round(sampleSize["news"]*nbLines["news"]))
 close(con) 
 ## Twitter data
 con <- file(twitterFile , "r")
-twitterSample <- sample(readLines(con, -1, skipNul = TRUE), round(sampleSize["twitter"]*nbLines["twitter"]))
+twitterSample <- sample(readLines(con, -1, skipNul = TRUE, encoding = 'UTF8'), round(sampleSize["twitter"]*nbLines["twitter"]))
 close(con)
 
 
@@ -148,25 +164,60 @@ names(tokens) <- c("blogsSample", "newsSample", "twitterSample")
 gc(reset = TRUE)
 tracker <- rbind(tracker, data.frame(operation ="Tokenize sample text", time = Sys.time(), free.ram.Mo = getRam()))
 
+save(tokens, file = paste('../../data/Rda/tokens_', sampleSizeM,'.Rda', sep = ''))
 
+
+#load('../../data/Rda/sw/tokens_0.7.Rda')
+
+# other choice : included, removedShort 
+if (stopWordsAction == "removedFull") {
+        ## We will keep the stopwords for the model, remove profanity
+        myStopWords <- c(badWords,
+                         stopwords("en")
+        ) 
+}
+if (stopWordsAction == "removedShort") {
+        ## We will keep the stopwords for the model, remove profanity
+        myStopWords <- c(badWords,
+                         "and", "or"
+        ) 
+}
+if (stopWordsAction == "included") {
+        ## We will keep the stopwords for the model, remove profanity
+        myStopWords <- c(badWords
+                         #,stopwords("en")
+        ) 
+}
 
 ## =============================================================================
 ##      IV. 1-Grams
 ## =============================================================================
 
-## We will keep the stopwords for the model, remove profanity
-myStopWords <- c(badWords
-                 #,stopwords("en")
-                 ) 
 
 ## -----------------------------------------------------------------------------
-##      Create Vocabulary
+##      Create TCM
 ## -----------------------------------------------------------------------------
 ## Create the iterator on the tokens
 it <- itoken(tokens, progessbar = TRUE)
 
 ## Generate the vocabulary using the iterator, 1-gram badwords / stopwords list.
 vocab1 <- create_vocabulary(it, ngram = c(ngram_min = 1L, ngram_max = 1L), stopwords = myStopWords)
+
+
+
+## -----------------------------------------------------------------------------
+##      Create TCM of 1-Grams
+## -----------------------------------------------------------------------------
+
+## We need to reinitialise iterator : it
+it <- itoken(tokens)
+cooccurence_vectorizer <- vocab_vectorizer(vocab1, grow_dtm = FALSE, skip_grams_window = 5L)
+tcm <- create_tcm(it, cooccurence_vectorizer)
+
+## Here we create dtm directly:
+v_vectorizer <- vocab_vectorizer(vocab1)
+tcm1 <- create_tcm(it, v_vectorizer)
+
 
 ## -----------------------------------------------------------------------------
 ##      Create DTM of 1-Grams
@@ -177,14 +228,14 @@ it <- itoken(tokens)
 
 ## Here we create dtm directly:
 v_vectorizer <- vocab_vectorizer(vocab1)
-dtm1 <- create_dtm(it, v_vectorizer)
-temp <- colSums(dtm1)
+temp <- colSums(create_dtm(it, v_vectorizer))
 ## Order and keep only terms appearing more than once
-temp <- temp[order(temp, decreasing = TRUE) & temp > 1]
+temp <- temp[order(temp, decreasing = TRUE)]
+temp <- temp[temp > minFreq[1]]
 uniGrams <- data.table(token = names(temp),
                        freq = temp,
                        type = 1)
-rm(temp,dtm1,vocab1)
+rm(temp,vocab1)
 
 ## Save Unigramds in R objects
 save(uniGrams, file = paste('../../data/Rda/uniGrams_', sampleSizeM,'.Rda', sep = ''))
@@ -217,14 +268,14 @@ it <- itoken(tokens)
 
 ## Here we create dtm directly:
 v_vectorizer <- vocab_vectorizer(vocab2)
-dtm2 <- create_dtm(it, v_vectorizer)
-temp <- colSums(dtm2)
+temp  <- colSums(create_dtm(it, v_vectorizer))
 ## Order and keep only terms appearing more than once
-temp <- temp[order(temp, decreasing = TRUE) & temp > 1]
+temp <- temp[order(temp, decreasing = TRUE)]
+temp <- temp[temp > minFreq[2]]
 biGrams <- data.table(token = names(temp),
                        freq = temp,
                        type = 2)
-rm(temp,dtm2,vocab2)
+rm(temp,vocab2)
 
 ## Save Unigramds in R objects
 save(biGrams, file = paste('../../data/Rda/biGrams_', sampleSizeM,'.Rda', sep = ''))
@@ -257,17 +308,56 @@ it <- itoken(tokens)
 
 ## Here we create dtm directly:
 v_vectorizer <- vocab_vectorizer(vocab3)
-dtm3 <- create_dtm(it, v_vectorizer)
-temp <- colSums(dtm3)
+temp <- colSums(create_dtm(it, v_vectorizer))
 ## Order and keep only terms appearing more than once
-temp <- temp[order(temp, decreasing = TRUE) & temp > 1]
+temp <- temp[order(temp, decreasing = TRUE)]
+temp <- temp[temp > minFreq[3]]
 triGrams <- data.table(token = names(temp),
                       freq = temp,
                       type = 3)
-rm(temp,dtm2,vocab2)
+rm(temp,vocab3)
 
 ## Save Unigramds in R objects
 save(triGrams, file = paste('../../data/Rda/triGrams_', sampleSizeM,'.Rda', sep = ''))
+
+
+# Track
+gc(reset = TRUE)
+tracker <- rbind(tracker, data.frame(operation ="Generate Unigrams", time = Sys.time(), free.ram.Mo = getRam()))
+
+## =============================================================================
+##      VII. 4-Grams
+## =============================================================================
+
+## -----------------------------------------------------------------------------
+##      Create Vocabulary
+## -----------------------------------------------------------------------------
+## Create the iterator on the tokens
+it <- itoken(tokens, progessbar = TRUE)
+
+## Generate the vocabulary using the iterator, 1-gram badwords / stopwords list.
+vocab4 <- create_vocabulary(it, ngram = c(ngram_min = 4L, ngram_max = 4L), stopwords = myStopWords)
+
+## -----------------------------------------------------------------------------
+##      Create DTM of 3-Grams
+## -----------------------------------------------------------------------------
+
+## We need to reinitialise iterator : it
+it <- itoken(tokens)
+
+## Here we create dtm directly:
+v_vectorizer <- vocab_vectorizer(vocab4)
+temp <- colSums(create_dtm(it, v_vectorizer))
+## Order and keep only terms appearing more than once
+temp <- temp[order(temp, decreasing = TRUE)]
+temp <- temp[temp > minFreq[4]]
+quadGrams <- data.table(token = names(temp),
+                       freq = temp,
+                       type = 4)
+rm(temp,vocab4)
+
+## Save Unigramds in R objects
+save(quadGrams, file = paste('../../data/Rda/quadGrams_', sampleSizeM,'.Rda', sep = ''))
 
 
 # Track
