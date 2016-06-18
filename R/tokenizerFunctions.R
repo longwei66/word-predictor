@@ -65,7 +65,12 @@ unTwitter <- function(t){
 #'
 #' @examples
 cleanText <- function(t) {
-        t <- gsub("[^a-z -\\']", "", t)
+        ## replace non standard quotes
+        t <- gsub(pattern = "’", replacement = "'", x = t)
+        ## Remove all non alphabetic quote and hyphen, begining space and final space
+        #t <- gsub("[^a-z \\-\\']|^ +| +$", "", t, perl = TRUE)
+        ## Remove all non single spaces
+        #t <- gsub(" {2,}", " ", t, perl = TRUE)
         return(t)
 }
 
@@ -85,9 +90,55 @@ myTokenizer <- function(v, tokenizer = word_tokenizer) {
         
         v %>%
                 unTwitter %>%
-                replaceShortEnglish %>%
                 cleanText %>%
+                replaceShortEnglish %>%
                 tokenizer 
         # poerter stemmer
         #  %>% lapply(wordStem, 'en')
 }
+
+
+
+pickMyGram <- function(myText, stpW) {
+        myNgram <- tolower(myText)
+        myNgram <- removeNumbers(myNgram)
+        myNgram <- unTwitter(myNgram)
+        myNgram <- cleanText(myNgram)
+        myNgram <- replaceShortEnglish(myNgram)
+        myNgram <- removePunctuation(myNgram)
+        myNgram <- removeWords(x = myNgram, words = stpW)
+        myNgram <- stripWhitespace(myNgram)
+        myNgram <- gsub("^ +| +$", "", myNgram, perl = TRUE)
+        
+        words <- unlist(strsplit(myNgram, " "))
+        return(list(
+                myTriGram = paste(words[length(words)-2],"_",words[length(words)-1],"_",words[length(words)], sep=""),
+                myBiGram = paste(words[length(words)-1],"_",words[length(words)], sep=""),
+                myUniGram = words[length(words)])
+               )
+}
+
+
+
+pickMyGramHash <- function(myText, stpW) {
+        myNgram <- tolower(myText)
+        myNgram <- removeNumbers(myNgram)
+        myNgram <- unTwitter(myNgram)
+        myNgram <- cleanText(myNgram)
+        myNgram <- replaceShortEnglish(myNgram)
+        myNgram <- removePunctuation(myNgram)
+        myNgram <- removeWords(x = myNgram, words = stpW)
+        myNgram <- stripWhitespace(myNgram)
+        myNgram <- gsub("^ +| +$", "", myNgram, perl = TRUE)
+        
+        words <- unlist(strsplit(myNgram, " "))
+        
+        
+        return(list(
+                myTriGram = spooky.32(paste(words[length(words)-2], words[length(words)-1], words[length(words)], sep = "_")),
+                myBiGram = spooky.32(paste(words[length(words)-1], words[length(words)], sep = "_")),
+                myUniGram = spooky.32(words[length(words)])
+        ))
+}
+
+
