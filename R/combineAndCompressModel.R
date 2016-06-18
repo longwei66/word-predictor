@@ -4,7 +4,9 @@
 ##
 ##              0. Main configuration
 ##              1. Load the full model from Rda files
-##              2. 
+##              2. Remove low frequency terms
+##              3. create unique data structure by merging models in a data.table
+##              4. create hash index, compress freq by log
 ##
 ## =============================================================================
 
@@ -131,7 +133,7 @@ load('../Models/1-4_Grams_with_sw_limit1.Rda')
 
 
 ## -----------------------------------------------------------------------------
-##      4. create hash index
+##      4. create hash index, compress freq by log
 ## -----------------------------------------------------------------------------
 
 ## Bind all elementary models in one model
@@ -147,6 +149,11 @@ myModel <-
         )
 # object.size(myModel) / 1024 ^2
 # 598.253349304199 Mb
+
+## For uni-grams, replace the missing index by the tolen
+myModel[ type == 1, index := token]
+
+
 
 ## Create the hash function using the package hashFunction::
 ## we use the spooky.32, there are other option not tried yet

@@ -135,10 +135,27 @@ pickMyGramHash <- function(myText, stpW) {
         
         
         return(list(
+                myInput = c(paste(words[length(words)-2], words[length(words)-1], words[length(words)], sep = "_"),
+                            paste(words[length(words)-1], words[length(words)], sep = "_"),
+                           words[length(words)]
+                            ),
                 myTriGram = spooky.32(paste(words[length(words)-2], words[length(words)-1], words[length(words)], sep = "_")),
                 myBiGram = spooky.32(paste(words[length(words)-1], words[length(words)], sep = "_")),
-                myUniGram = spooky.32(words[length(words)])
+                myUniGram = spooky.32(words[length(words)]),
+                myToken = spooky.32(words[length(words)])
         ))
 }
 
-
+countMyToken <- function(myGram, myModel, type){
+        
+        if (type > 1) {
+                myGram <- unlist(strsplit(myGram, "_"))
+                wd <- myGram[length(myGram)]
+                idx <- spooky.32(paste(myGram[1:(length(myGram)-1)], collapse = "_"))
+                myModel[(token == wd & index == idx & type == type), freq]
+        } else {
+                idx <- spooky.32(myGram)
+                myModel[(index == idx & type == type), freq]
+        }
+                
+}
