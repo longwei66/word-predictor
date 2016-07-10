@@ -1,0 +1,151 @@
+---
+title: "Word predictor How-to"
+author: "Longwei"
+date: "28 juin 2016"
+output: html_document
+---
+
+# Introduction and objectives
+
+## Objective of the project
+
+The goal of this project is to build a product (we will call it a "word predictor") which can predict the next word knowing the first words of a sentence. The final result of the project consists in an application (built with Shiny framework) using a model and algorithm based on machine learning and natural language processing tools (NLP). The model will be built on an data set consisting in extracts from US news, twitter and blogs.
+
+
+## Objective of this document
+
+The objective of this document is to describe the different scripts, functions and data sets used in this project and how to use them
+
+# Data source & Scripts
+
+## Text data base
+
+The data is from a corpus called HC Corpora ([www.corpora.heliohost.org](www.corpora.heliohost.org)).
+See the readme file at [http://www.corpora.heliohost.org/aboutcorpus.html](http://www.corpora.heliohost.org/aboutcorpus.html) for details on the corpora available. The files have been language filtered but may still contain some foreign text.
+
+The original data in its uncompressed version is store in a directory outside of this repository : `../data/final/en_US`.
+
+It consists in 3 files stored in 3 variables :
+```{r, eval=FALSE, message=FALSE, warning=FALSE}
+blogsFile <-"../../data/final/en_US/en_US.blogs.txt"
+newsFile <- "../../data/final/en_US/en_US.news.txt"
+twitterFile <- "../../data/final/en_US/en_US.twitter.txt"
+```
+
+
+
+## File and folder organisation
+
+`./word-predictor` folder contains :
+
+- `doc` : with all documentation
+- `Models` : where ngrams models are stored as Rda objects (uncompressed for faster execution)
+- `Rmd` : for reports
+- `R` with main scripts
+- `sandbox` : for work in progress
+
+## Main scripts
+
+### Model Builder
+
+`modelBuilder.R` is the main script to build the model, it executes several scripts, Rsession need to be restarted between each of the steps if you have limited RAM, shoudl be ok with 16Go or more and 50% of the corpus.
+
+The sequence is the following :
+
+1. Make sample Text
+2. Make tokens
+3. Make nGrams models : `make1Gram.R` generate the UniGram model from a text input, `make{2,3,4,5}Gram.R` generate the Bi/Tri/Quad/Quint-Gram model from a text input.
+4. `combineAndCompressModel.R` to combine al the nGrams model in one data set which is compressed (sorting low frequency and hash function for the index)
+5. Last step consist in extra compression of the model to make a light version for our shiny app using `prepareModelforShiny.R`
+
+### Functions
+
+- `tokenizerFunctions.R` contains the main functions (tokenizer and others)
+- `predictFunction.R` contains the main predicting functions
+
+
+# Building the model
+
+## General Principles
+
+The process followed to build our ngram model is the following :
+
+1. Download the data, extract the zip file, make a summary of the file properties.
+2. Load a random sample of the data in R (as the data set is huge, this is necessary to save time and memory). For final model we used 75% of the initial corpus
+3. Clean the data, tokenise (extract words).
+4. Compute frequency for n-grams (sequence of 1 to n words : 1 to 5 in this report).
+5. Build the model by combining ngrams model from 1 to 5, removing low frequency terms and hashin the index for faster pattern match. The output of this process is an object `myModel` of class `data.table`
+6. Make a light version of this model to be embedded in word-predictor shiny app. The output of this process is an object `myModelShinyCompact` of class `data.table`.
+
+
+## Operating procedure
+
+In order to generate the adequate model, you need to follow the instruction bellow :
+
+- download and unzip the corpus in `../data/final/en_US`
+- launch the `modelBuilder.R` script in chunk, the % of the initial corpus to be taken into account is defined by the variable `sampleSizeM` setup a the begining of the script.
+- for each step of the process, you need to restart R Session ot refresh RAM
+
+## Available models
+
+
+
+## Codebook
+
+The model is structured as follows :
+
++-------------+---------+------------+-----------------------------+
+| Variable    | Class   | Values     | Comments                    |
++-------------+---------+------------+-----------------------------+
+| token       | chr     | the, to,   | The list of final words     |
+|             |         | private    | of the respective nGrams    |
++-------------+---------+------------+-----------------------------+
+| freq        | num     | 2,3 ....   | The frequency of occurence  |
+|             |         | 3553669    | of the respective nGram     |
++-------------+---------+------------+-----------------------------+
+| type        | num     | 1,2,3,4,   | The type of nGram           |
++-------------+---------+------------+-----------------------------+
+| index       | num     | -909212201 | The hash index of the nGram |
+|             |         | 1479131074 | basically spooky.32 has of  |
+|             |         |            | the n-1 words of the ngram  |
++-------------+---------+------------+-----------------------------+
+
+
+# Prediction Functions
+
+## Main prediction function
+
+The word prediction main function returns a list of possible words for a given input text :
+
+```{r, eval=FALSE}
+predictNextWord(
+        inputText = "I'd give anything to see", # Text for which last word has to be predicted
+        ngramModel = myModel, # ngram model to to used
+        myBadWords = badWords, # bad words to be filtered (need ot be same as model creation)
+        removeSW = FALSE # we can remove stop words as option in the answer
+        )
+```
+
+It will retuen a list of objects :
+
+```{r, eval=FALSE}
+list(
+                gr = gr, # a list text input last 1,2,3,4 grams with hash of 4,3,2,1 grams
+                q5 = q5, # matching list of quintGrams
+                q4 = q4, # matching list of quadGrams
+                q3 = q3, # matching list of triGRams
+                q2 = q2, # matching list of biGrams
+                q1 = q1, # matchin list of uniGrams
+                answer = answer, # Propose answer with associated probabilities
+                biGrams = inputBiGrams, # the input bigrams
+                uniGrams = inputUniGrams # the input unigra;s
+        )
+```
+
+
+
+# Example
+
+# word-predictor Shiny Application
+
+

@@ -1,0 +1,100 @@
+## =============================================================================
+##
+##                      Prediction Example
+##
+##                      (run from main dir ./)
+##
+## =============================================================================
+
+
+## =============================================================================
+## Basic configuration
+## =============================================================================
+## Defin the sampling % of the initial data
+## This will configure automatically the model to be used
+sampleSizeM <- 0.02 # Available models are 0.75, 0.5, 0.15, 0.05 and 0.03, 0.01
+## Make a persistent record of this variable in case we have to restart R Session
+save(sampleSizeM, file = './R/sampleSizeM.Rda')
+
+# Main libs
+# ----------
+source('./R/loadMainLibraries.R', chdir = TRUE)
+# Source R sripts and functions
+source('./R/tokenizerFunctions.R', chdir = TRUE)
+source('./R/predictFunction.R', chdir = TRUE)
+load('./R/sampleSizeM.Rda')
+
+# Bad words
+# ---------
+badWordsUrl <- "./../data/swearWords.txt"
+badWords <- read.csv(badWordsUrl,stringsAsFactors = FALSE)[,1]
+
+
+## =============================================================================
+##      Load Final Model
+## =============================================================================
+load(file = paste('./Models/modelCompact_',sampleSizeM,'.Rda',sep=''))
+#load(file = paste('./Models/modelShinyCompact_',sampleSizeM,'.Rda',sep=''))
+
+
+
+## =============================================================================
+##      Load the test data
+## =============================================================================
+
+# Load Sample text
+load(paste('../data/Rda/sampleText_', sampleSizeM, '_.Rda', sep = ""))
+
+# Set the seed
+set.seed(12345)
+
+# Build a corpus of 100 lines of the initial test data
+TestCorpus <- quanteda::corpus(base::sample(c(textSample$testingBlogs#,
+                                                #textSample$testingNews,
+                                                #textSample$testingTwitter
+                                                ), size = 100))
+
+# Extract sentences
+myTestCorpus <- as.data.frame(unlist(tokenize(TestCorpus, 
+         what = "sentence")))
+names(myTestCorpus) <- c("sentence")
+myTestCorpus$sentence <- as.character(myTestCorpus$sentence)
+
+# Extract last word
+myTestCorpus$inputText <- gsub(pattern = '\\(|\\)|\\"', replacement = "", x = myTestCorpus$sentence)
+myTestCorpus$lastWord <-  gsub(pattern = "(.*)\\s((\\w|-)+)(\\.|\\?|\\!|\\:|,|\\.{3})?$", replacement = "\\2", x = myTestCorpus$inputText) 
+myTestCorpus$inputText <-  gsub(pattern = "(.*)\\s((\\w|-)+)(\\.|\\?|\\!|\\:|,|\\.{3})?$", replacement = "\\1", x = myTestCorpus$inputText) 
+
+
+
+## =============================================================================
+##      Make predictions
+## =============================================================================
+myTestCorpus$prediction1 <- ""
+myTestCorpus$prediction2 <- ""
+myTestCorpus$prediction3 <- ""
+myTestCorpus$freqLastWord <- 0
+
+#for (i in 1:nrow(myTestCorpus)) {
+for (i in 1:3) {
+        a <- predictNextWordFast(inputText = myTestCorpus[i,]$inputText,
+                             ngramModel = myModel,
+                             myBadWords = badWords
+                             )
+        if(length(a$answer) > 2){
+                myTestCorpus[i,]$prediction1 <- a$answer[1,]
+                myTestCorpus[i,]$prediction2 <- a$answer[2,]
+                myTestCorpus[i,]$prediction3 <- a$answer[3,]
+        }
+        if(length(a$answer) > 1){
+                myTestCorpus[i,]$prediction1 <- a$answer[1,]
+                myTestCorpus[i,]$prediction2 <- a$answer[2,]
+        }
+        if(length(a$answer) == 1){
+                myTestCorpus[i,]$prediction1 <- a$answer[1,]
+        }
+        #ff <- a$answer[ token %in% myTestCorpus[i,]$lastWord,]
+        #if(!is.null(ff)){
+        #        myTestCorpus[i,]$freqLastWord <- ff}
+        }
+

@@ -10,92 +10,64 @@
 ##
 ## =============================================================================
 
-library(data.table) # better than data frames
-library(text2vec) # need to tokenizer and %>%
-library(tm) # need for stopwords and preprocessing
-library(hashFunction) # for hashing refrence of n-grams
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #       0. MAIN CONFIGURATION
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Configuration of stop words 
-stopWordsAction <- "included" # other choice : removedFull, included, removedShort 
+
+# % of corpus used inthe model
+percCorpus <- sampleSizeM
 
 # Filter bellow minFreq
 minFreq <- c(
         1, # for unigram
         1, # for bigrams
         1, # for trigrmas
-        1 # for quadgrams
-)
+        1, # for quadgrams
+        1 # for quintgrams
+) * minFreqRatio
 
 
-# Bad words
-# Use to filter profanity, used always
-badWordsUrl <- "../../data/swearWords.txt"
-badWords <- read.csv(badWordsUrl,stringsAsFactors = FALSE)[,1]
-
-
-## Stop words configuration
-## Choose one of the option to match with model creation
-## normally should be set up to included to keep all stop words
-
-stopWordsAction <- "included" # other choice : included, removedShort, removedFull
-if (stopWordsAction == "removedFull") {
-        ## We will keep the stopwords for the model, remove profanity
-        myStopWords <- c(badWords,
-                         stopwords("en")
-        ) 
-}
-if (stopWordsAction == "removedShort") {
-        ## We will keep the stopwords for the model, remove profanity
-        myStopWords <- c(badWords,
-                         "and", "or"
-        ) 
-}
-if (stopWordsAction == "included") {
-        ## We will keep the stopwords for the model, remove profanity
-        myStopWords <- c(badWords
-                         #,stopwords("en")
-        ) 
-} 
 
 
 ## -----------------------------------------------------------------------------
 ##      1. Load the full Model (this takes time AND RAM)
-## -----------------------------------------------------------------------------
-
-## Load 1-4 Grams with 0.7 of the corpus, inc stopwords
-
-load('../../data/Rda/sw/uniGrams_0.7.Rda')
-#object.size(uniGrams) / 1024 ^2
-#51.5396881103516 bytes
-load('../../data/Rda/sw/biGrams_0.7.Rda')
-#object.size(biGrams) / 1024 ^2
-#923.208602905273 bytes
-load('../../data/Rda/sw/triGrams_0.7.Rda')
-#object.size(triGrams) / 1024 ^2
-#3121.19731140137 bytes
-load('../../data/Rda/sw/quadGrams_0.7.Rda')
-# object.size(quadGrams) / 1024 ^2
-# 5094.49355316162 Mb
-
-## -----------------------------------------------------------------------------
 ##      2. Remove low frequency terms
 ## -----------------------------------------------------------------------------
 
-#object.size(uniGrams[freq > 1,]) / 1024 ^2
-#18.1388092041016 bytes
+
+## Load 1-4 Grams with 0.05 of the corpus, inc stopwords
+        
+load(paste('../../data/Rda/sw/uniGrams_',percCorpus,'.Rda', sep= ''))
+object.size(uniGrams) / 1024 ^2
 uniGrams <- uniGrams[freq > minFreq[1]]
-#object.size(biGrams[freq > 1,]) / 1024 ^2
-#252.785987854004 bytes
+object.size(uniGrams)/ 1024 ^2
+
+
+load(paste('../../data/Rda/sw/biGrams_',percCorpus,'.Rda', sep= ''))
+object.size(biGrams) / 1024 ^2
 biGrams <- biGrams[freq > minFreq[2]]
-#object.size(triGrams[freq > 1,]) / 1024 ^2
-#456.306106567383 Mb
+object.size(biGrams)/ 1024 ^2
+
+
+
+load(paste('../../data/Rda/sw/triGrams_',percCorpus,'.Rda', sep= ''))
+object.size(triGrams) / 1024 ^2
 triGrams <- triGrams[freq > minFreq[3]]
-#object.size(quadGrams[freq > 1,]) / 1024 ^2
-#351.12841796875 Mb
+object.size(triGrams)/ 1024 ^2
+
+
+load(paste('../../data/Rda/sw/quadGrams_',percCorpus,'.Rda', sep= ''))
+object.size(quadGrams) / 1024 ^2
 quadGrams <- quadGrams[freq > minFreq[4]]
+object.size(quadGrams)/ 1024 ^2
+
+
+
+load(paste('../../data/Rda/sw/quintGrams_',percCorpus,'.Rda', sep= ''))
+object.size(quintGrams) / 1024 ^2
+quintGrams <- quintGrams[freq > minFreq[5]]
+object.size(quintGrams)/ 1024 ^2
 
 
 ## -----------------------------------------------------------------------------
@@ -110,26 +82,33 @@ quadGrams <- quadGrams[freq > minFreq[4]]
 ## Separate bigrams, extract last word from the first word
 biGrams[,index := gsub(pattern = "(.*)_.*$", replacement = "\\1", x = token)]
 biGrams[,token := gsub(pattern = ".*_(.*)$", replacement = "\\1", x = token)]
-#object.size(biGrams) / 1024 ^2
-#111.047393798828 bytes
+object.size(biGrams) / 1024 ^2
+
 
 ## Separate tri-grams, extract last word from the first 2 words
 triGrams[,index := gsub(pattern = "(.*)_.*$", replacement = "\\1", x = token)]
 triGrams[,token := gsub(pattern = ".*_(.*)$", replacement = "\\1", x = token)]
-#object.size(triGrams) / 1024 ^2
-#241.388916015625 bytes
+object.size(triGrams) / 1024 ^2
 
-## Separate tri-grams, extract last word from the first 3 words
+
+## Separate quad-grams, extract last word from the first 3 words
 quadGrams[,index := gsub(pattern = "(.*)_.*$", replacement = "\\1", x = token)]
 quadGrams[,token := gsub(pattern = ".*_(.*)$", replacement = "\\1", x = token)]
-#object.size(quadGrams) / 1024 ^2
-#237.781982421875 bytes
+object.size(quadGrams) / 1024 ^2
+
+
+## Separate quad-grams, extract last word from the first 3 words
+quintGrams[,index := gsub(pattern = "(.*)_.*$", replacement = "\\1", x = token)]
+quintGrams[,token := gsub(pattern = ".*_(.*)$", replacement = "\\1", x = token)]
+object.size(quintGrams) / 1024 ^2
+
+
 
 ## Save the intemediary models on the disk
-save(uniGrams, biGrams, triGrams, quadGrams, file = '../Models/1-4_Grams_with_sw_limit1.Rda')
+save(uniGrams, biGrams, triGrams, quadGrams, quintGrams, file = paste('../Models/1-5_Grams_',percCorpus,'_with_sw_limit1.Rda',sep=''))
 
 ## Reload the model
-load('../Models/1-4_Grams_with_sw_limit1.Rda')
+load(paste('../Models/1-5_Grams_',percCorpus,'_with_sw_limit1.Rda',sep=''))
 
 
 ## -----------------------------------------------------------------------------
@@ -143,12 +122,13 @@ myModel <-
                         uniGrams, # not necessary but keep if need data from unigrams
                         biGrams, 
                         triGrams, 
-                        quadGrams),
+                        quadGrams,
+                        quintGrams),
                 use.names = TRUE,
                 fill = TRUE
         )
-# object.size(myModel) / 1024 ^2
-# 598.253349304199 Mb
+object.size(myModel) / 1024 ^2
+
 
 ## For uni-grams, replace the missing index by the tolen
 myModel[ type == 1, index := token]
@@ -161,18 +141,10 @@ myHashFunction <- function(x) as.numeric(spooky.32(x))
 
 ## hash the column index, replace it by the hash
 myModel[, index := sapply(as.vector(index), myHashFunction)]
-# We save 190 Mo of object size
-# object.size(myModel) / 1024 ^2
-# 408.385925292969 Mb
+object.size(myModel) / 1024 ^2
 
-## we use the log the Freq instead of Freq to compact Freq column
-## 
-myModel[, freq := as.integer(round(log(freq)*10))]
-# We saved antoehr 50 Mo
-# object.size(myModel) / 1024 ^2
-# 358.8916
 
-save(myModel, file = '../Models/modelCompact_0.7.Rda')
+save(myModel, file = paste('../Models/modelCompact_',percCorpus,'.Rda',sep=''))
 #          token freq type      index
 # 1:         the  150    1 -733979018
 # 2:          to  145    1 -733979018
@@ -186,4 +158,10 @@ save(myModel, file = '../Models/modelCompact_0.7.Rda')
 # 12974637:          at    7    4  302397908
 # 12974638:      viewed    7    4  475301257
 
-load(file = '../Models/modelCompact_0.7.Rda')
+
+
+
+
+
+
+
