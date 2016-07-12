@@ -12,7 +12,7 @@
 ## =============================================================================
 ## Defin the sampling % of the initial data
 ## This will configure automatically the model to be used
-sampleSizeM <- 0.02 # Available models are 0.75, 0.5, 0.15, 0.05 and 0.03, 0.01
+sampleSizeM <- 0.75 # Available models are 0.75, 0.5, 0.15, 0.05 and 0.03, 0.01
 ## Make a persistent record of this variable in case we have to restart R Session
 save(sampleSizeM, file = './R/sampleSizeM.Rda')
 
@@ -33,8 +33,8 @@ badWords <- read.csv(badWordsUrl,stringsAsFactors = FALSE)[,1]
 ## =============================================================================
 ##      Load Final Model
 ## =============================================================================
-load(file = paste('./Models/modelCompact_',sampleSizeM,'.Rda',sep=''))
-#load(file = paste('./Models/modelShinyCompact_',sampleSizeM,'.Rda',sep=''))
+#load(file = paste('./Models/modelCompact_',sampleSizeM,'.Rda',sep=''))
+load(file = paste('./Models/modelShinyCompact_',sampleSizeM,'_1.Rda',sep=''))
 
 
 
@@ -46,7 +46,7 @@ load(file = paste('./Models/modelCompact_',sampleSizeM,'.Rda',sep=''))
 load(paste('../data/Rda/sampleText_', sampleSizeM, '_.Rda', sep = ""))
 
 # Set the seed
-set.seed(12345)
+set.seed(29706)
 
 # Build a corpus of 100 lines of the initial test data
 TestCorpus <- quanteda::corpus(base::sample(c(textSample$testingBlogs#,
@@ -74,27 +74,45 @@ myTestCorpus$prediction1 <- ""
 myTestCorpus$prediction2 <- ""
 myTestCorpus$prediction3 <- ""
 myTestCorpus$freqLastWord <- 0
+myTestCorpus$predDuration <- 0
+myTestCorpus$isPredicted <- FALSE
+
 
 #for (i in 1:nrow(myTestCorpus)) {
-for (i in 1:3) {
-        a <- predictNextWordFast(inputText = myTestCorpus[i,]$inputText,
-                             ngramModel = myModel,
-                             myBadWords = badWords
+for (i in 1:nrow(myTestCorpus)) {
+        message("::::::::")
+        message(i)
+        message("::::::::")
+        
+        t0 <- Sys.time()
+        a <- predictNextWord(inputText = myTestCorpus[i,]$inputText,
+                             ngramModel = myModelShinyCompact,
+                             myBadWords = badWords,
+                             algo = "stupidBackoff"
                              )
-        if(length(a$answer) > 2){
-                myTestCorpus[i,]$prediction1 <- a$answer[1,]
-                myTestCorpus[i,]$prediction2 <- a$answer[2,]
-                myTestCorpus[i,]$prediction3 <- a$answer[3,]
+        t1 <- Sys.time() 
+        myTestCorpus[i,]$predDuration <- as.numeric(t1 - t0)
+        
+        
+        if(nrow(a$answer) > 2){
+                myTestCorpus[i,]$prediction1 <- a$answer[1,token]
+                myTestCorpus[i,]$prediction2 <- a$answer[2,token]
+                myTestCorpus[i,]$prediction3 <- a$answer[3,token]
         }
-        if(length(a$answer) > 1){
-                myTestCorpus[i,]$prediction1 <- a$answer[1,]
-                myTestCorpus[i,]$prediction2 <- a$answer[2,]
+        if(nrow(a$answer) > 1){
+                myTestCorpus[i,]$prediction1 <- a$answer[1,token]
+                myTestCorpus[i,]$prediction2 <- a$answer[2,token]
         }
-        if(length(a$answer) == 1){
-                myTestCorpus[i,]$prediction1 <- a$answer[1,]
+        if(nrow(a$answer) == 1){
+                myTestCorpus[i,]$prediction1 <- a$answer[1,token]
         }
-        #ff <- a$answer[ token %in% myTestCorpus[i,]$lastWord,]
-        #if(!is.null(ff)){
-        #        myTestCorpus[i,]$freqLastWord <- ff}
+        ff <- a$answer[ token %in% myTestCorpus[i,]$lastWord,]
+        if(nrow(ff) > 0 ){
+                myTestCorpus[i,]$freqLastWord <- ff[,freq.Sum]}
+        
+        if(myTestCorpus[i,]$lastWord %in% c(myTestCorpus[i,]$prediction1, myTestCorpus[i,]$prediction2, myTestCorpus[i,]$prediction1)){
+                myTestCorpus[i,]$isPredicted <- TRUE
         }
+        
+}
 

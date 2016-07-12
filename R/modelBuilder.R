@@ -1,6 +1,6 @@
 ## Basic configuration
 setwd('./R/')
-sampleSizeM <- 0.02
+sampleSizeM <- 0.75
 save(sampleSizeM, file = './sampleSizeM.Rda')
 
 
@@ -255,55 +255,6 @@ source('./combineAndCompressModel.R')
 rm(list = ls(all=TRUE))
 .rs.restartR()
 
-## =============================================================================
-##      II. Make 1-grams TCM
-## =============================================================================
-# # Clear objects in memory
-# rm(list = ls(all=TRUE))
-# # Garbage collection (memory)
-# gg <- gc(reset = TRUE)
-# # Main libs
-# source('./loadMainLibraries.R')
-# # Source R sripts and functions
-# source('./tokenizerFunctions.R')
-# load('./sampleSizeM.Rda')
-# 
-# # Load Sample text
-# load(paste('../../data/Rda/tokens_', sampleSizeM, '.Rda', sep = ""))
-# 
-# # Bad words
-# badWordsUrl <- "../../data/swearWords.txt"
-# badWords <- read.csv(badWordsUrl,stringsAsFactors = FALSE)[,1]
-# 
-# source('./make1Gram_CO.R')
-# rm(list = ls(all=TRUE))
-# .rs.restartR()
-
-
-## =============================================================================
-##      II. Make 2-grams TCM
-## =============================================================================
-# # Clear objects in memory
-# rm(list = ls(all=TRUE))
-# # Garbage collection (memory)
-# gg <- gc(reset = TRUE)
-# # Main libs
-# source('./loadMainLibraries.R')
-# # Source R sripts and functions
-# source('./tokenizerFunctions.R')
-# load('./sampleSizeM.Rda')
-# 
-# # Load Sample text
-# load(paste('../../data/Rda/tokens_', sampleSizeM, '.Rda', sep = ""))
-# 
-# # Bad words
-# badWordsUrl <- "../../data/swearWords.txt"
-# badWords <- read.csv(badWordsUrl,stringsAsFactors = FALSE)[,1]
-# 
-# source('./make2Gram_CO.R')
-# rm(list = ls(all=TRUE))
-# .rs.restartR()
-
 
 ## =============================================================================
 ##      IX. Make for model for Shiny APP
@@ -326,7 +277,7 @@ badWords <- read.csv(badWordsUrl,stringsAsFactors = FALSE)[,1]
 # Load Compact model
 load(file = paste('../Models/modelCompact_',sampleSizeM,'.Rda',sep=''))
 
-keepGramRatio <- 1
+keepGramRatio <- 0.7
 source('./prepareModelforShiny.R')
 rm(list = ls(all=TRUE))
 .rs.restartR()

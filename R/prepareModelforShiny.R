@@ -6,10 +6,11 @@
 ## Sum of frequency keep
 
 keepGram <- list(
-        ratio1 = 0.99 * keepGramRatio,
-        ratio2 = 0.90 * keepGramRatio,
+        #ratio1 = 0.99 * keepGramRatio,
+        ratio1 = 1,
+        ratio2 = 1 * keepGramRatio,
         ratio3 = 0.95 * keepGramRatio,
-        ratio4 = 0.90 * keepGramRatio
+        ratio4 = 0.9 * keepGramRatio
 ) 
 
 
@@ -35,13 +36,13 @@ Y <- gr1[X,cumFreq]
 plot(X,Y)
 nr <- nrow(gr1)
 max <- gr1[nrow(gr1), cumFreq]
-th <- nrow(gr1[ cumFreq < keepGram$ratio1 * max ,])
+th <- nrow(gr1[ cumFreq <= keepGram$ratio1 * max ,])
 n
 th
 th / n
 
 ## Keep xx% of the cumed freq terms
-gr1Compact <- gr1[ cumFreq < keepGram$ratio1  * max ,]
+gr1Compact <- gr1[ cumFreq <= keepGram$ratio1  * max ,]
 object.size(gr1Compact) / 1024 ^2
 rm(gr1)
 
@@ -57,13 +58,13 @@ Y <- gr2[X,cumFreq]
 plot(X,Y)
 nr <- nrow(gr2)
 max <- gr2[nrow(gr2), cumFreq]
-th <- nrow(gr2[ cumFreq < keepGram$ratio2 * max ,])
+th <- nrow(gr2[ cumFreq <= keepGram$ratio2 * max ,])
 n
 th
 th / n
 
-## Keep 90% of the cumed freq terms
-gr2Compact <- gr2[ cumFreq < keepGram$ratio2 * max ,]
+## Keep keepGramRatio% of the cumed freq terms
+gr2Compact <- gr2[ cumFreq <= keepGram$ratio2 * max ,]
 object.size(gr2Compact) / 1024 ^2
 rm(gr2)
 
@@ -80,13 +81,13 @@ Y <- gr3[X,cumFreq]
 plot(X,Y)
 nr <- nrow(gr3)
 max <- gr3[nrow(gr3), cumFreq]
-th <- nrow(gr3[ cumFreq < keepGram$ratio3 * max ,])
+th <- nrow(gr3[ cumFreq <= keepGram$ratio3 * max ,])
 n
 th
 th / n
 
 ## Keep xxx% of the cumed freq terms
-gr3Compact <- gr3[ cumFreq < keepGram$ratio3 * max ,]
+gr3Compact <- gr3[ cumFreq <= keepGram$ratio3 * max ,]
 object.size(gr3Compact) / 1024 ^2
 rm(gr3)
 
@@ -102,13 +103,13 @@ Y <- gr4[X,cumFreq]
 plot(X,Y)
 nr <- nrow(gr4)
 max <- gr4[nrow(gr4), cumFreq]
-th <- nrow(gr4[ cumFreq < keepGram$ratio4 * max ,])
+th <- nrow(gr4[ cumFreq <= keepGram$ratio4 * max ,])
 n
 th
 th / n
 
 ## Keep 90% of the cumed freq terms
-gr4Compact <- gr4[ cumFreq < keepGram$ratio4 * max ,]
+gr4Compact <- gr4[ cumFreq <= keepGram$ratio4 * max ,]
 object.size(gr4Compact) / 1024 ^2
 rm(gr4)
 
