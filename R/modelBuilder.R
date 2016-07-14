@@ -277,7 +277,7 @@ badWords <- read.csv(badWordsUrl,stringsAsFactors = FALSE)[,1]
 # Load Compact model
 load(file = paste('../Models/modelCompact_',sampleSizeM,'.Rda',sep=''))
 
-keepGramRatio <- 0.7
+keepGramRatio <- 0.4
 source('./prepareModelforShiny.R')
 rm(list = ls(all=TRUE))
 .rs.restartR()

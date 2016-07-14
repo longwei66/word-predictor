@@ -34,7 +34,7 @@ badWords <- read.csv(badWordsUrl,stringsAsFactors = FALSE)[,1]
 ##      Load Final Model
 ## =============================================================================
 #load(file = paste('./Models/modelCompact_',sampleSizeM,'.Rda',sep=''))
-load(file = paste('./Models/modelShinyCompact_',sampleSizeM,'_1.Rda',sep=''))
+load(file = paste('./Models/modelShinyCompact_',sampleSizeM,'_0.4.Rda',sep=''))
 
 
 

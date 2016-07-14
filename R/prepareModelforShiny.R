@@ -8,10 +8,14 @@
 keepGram <- list(
         #ratio1 = 0.99 * keepGramRatio,
         ratio1 = 1,
-        ratio2 = 1 * keepGramRatio,
-        ratio3 = 0.95 * keepGramRatio,
-        ratio4 = 0.9 * keepGramRatio
+        ratio2 = 0.8,
+        ratio3 = 0.6,
+        ratio4 = 0.4
 ) 
+
+# 0.6 => 1,0.7,0.8,0.6
+# 0.9 => 1,0.99,0.95,0.9
+# 0.4 => 1, 0.8, 0.6, 0.4
 
 
 ## Remove quintGrams
