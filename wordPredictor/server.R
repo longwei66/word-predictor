@@ -18,7 +18,7 @@ badWords <- read.csv(badWordsUrl,stringsAsFactors = FALSE)[,1]
 ##      Load Final Model
 ## =============================================================================
 #load(file = paste('../Models/modelCompact_',sampleSizeM,'.Rda',sep=''))
-load(file = './modelShinyCompact_0.75_0.7.Rda')
+load(file = './modelShinyCompact_0.75_0.4.Rda')
 
 
 
@@ -38,7 +38,7 @@ shinyServer(
                                         algo = "stupidBackoff")
                         
                                 myAnswer <- paste(
-                                        answer$answer[1:min(10, nrow(answer$answer)),token],
+                                        answer$answer[1:min(7, nrow(answer$answer)),token],
                                         collapse = " / "
                                       )
                         } else {

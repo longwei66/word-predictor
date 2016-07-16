@@ -17,7 +17,7 @@
 # myModel <- myModelShinyCompact
 # ngramModel <- myModel
 # myBadWords <- badWords
-# inputText <- "I want to have a salad with grilled fertetertepuwte"
+# inputText <- "I am going back home after sch"
 
 predictNextWord <- function(inputText, ngramModel, myBadWords, algo = "basic"){
         
@@ -43,24 +43,26 @@ predictNextWord <- function(inputText, ngramModel, myBadWords, algo = "basic"){
         ## Look for matching quad grams
         ## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         q4 <- ngramModel[(index == gr$myTriGramH & type == 4), ]
+        r4 <- nrow(q4)
         ## Count the frequency of matching root 3 gram
         cnt3 <- countMyToken(myGram = gr$myInput[2], ngramModel, 3)
         
         ## Look for matching tri grams
         ## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         q3 <- ngramModel[(index == gr$myBiGramH & type == 3), ]
+        r3 <- nrow(q3)
         ## Count the frequency of matching root 2 gram
         cnt2 <- countMyToken(myGram = gr$myInput[3], ngramModel, 2)
         
         ## Look for matching bi grams
         ## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         q2 <- ngramModel[(index == gr$myUniGramH & type == 2), ]
-        
+        r2 <- nrow(q2)
         
         ## Look for matching unigram
         ## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         q1 <- ngramModel[(index == gr$myUniGramH & type == 1), ]
-        cnt0 <- nrow(q1)
+        r1 <- nrow(q1)
         voccSize <- nrow(ngramModel)
         
         ## init final choice which is the flat list of unigrams
@@ -82,15 +84,15 @@ predictNextWord <- function(inputText, ngramModel, myBadWords, algo = "basic"){
                 # use quad grams, if no evidence, use tri grams, .. bi grams, unigrams
                 
                 ## look for matching quadgrams
-                if ( cnt3 > 1) {
+                if ( r4 > 0) {
                         q4[,freq := round(freq / cnt3 * 100,5)]
                 } else {
                         ## Look for matching tri grams
-                        if ( cnt2 > 1 ) {
+                        if ( r3 > 0 ) {
                                 q3[,freq := round(freq / cnt2 *100,5)]
                         } else {
                                 ## Look for matching bii grams
-                                if ( cnt1 > 1) {
+                                if ( r2 > 0) {
                                         q2[,freq := round(freq / cnt1 *100,5)]
                                 } else {
                                         ## propose unigrams
@@ -115,31 +117,28 @@ predictNextWord <- function(inputText, ngramModel, myBadWords, algo = "basic"){
                 ## Parse the nGrams model
                 ## -----------------------------------------------------
                 ## look for matching quadgrams
-                if ( cnt3 > 1) {
-                        q4[,freq := round(freq / cnt3 * 100,5)]
-                        q3[,freq := round(freq / cnt2 *100 * 0.4,5)]
-                        q2[,freq := round(freq / cnt1 *100 * 0.3,5)]
-                        q1[,freq := round(freq / voccSize *100,5)]
+                if ( r4 > 1) {
+                        q4[,freq := round(freq / cnt3 * 100 * 0.5,5)]
+                        q3[,freq := round(freq / cnt2 *100 * 0.3,5)]
+                        q2[,freq := round(freq / cnt1 *100 * 0.2,5)]
+                        #q1[,freq := round(freq / voccSize *100,5)]
                 } else {
                         ## Look for matching tri grams
-                        if ( cnt2 > 1 ) {
-                                q3[,freq := round(freq / cnt2 *100,5)]
+                        if ( r3 > 1 ) {
+                                q3[,freq := round(freq / cnt2 *100 * 0.7,5)]
                                 q2[,freq := round(freq / cnt1 *100 * 0.3,5)]
-                                q1[,freq := round(freq / voccSize *100,5)]
+                                #q1[,freq := round(freq / voccSize *100,5)]
                         } else {
                                 ## Look for matching bii grams
-                                if ( cnt1 > 1) {
+                                if ( r2 > 1) {
                                         q2[,freq := round(freq / cnt1 *100,5)]
-                                        q1[,freq := round(freq / voccSize *100,5)]
+                                        #q1[,freq := round(freq / voccSize *100,5)]
                                 } else {
-                                        if (cnt0 > 0) {
-                                        ## Look for matching unigram
-                                        q1[,freq := round(freq / voccSize *100,5)]
-                                        } else {
-                                                ## propose unigrams
-                                                q0 <- ngramModel[type == 1, ]
-                                                q0[1:10,]      
-                                                }
+                                        
+                                        ## propose unigrams
+                                        q0 <- ngramModel[type == 1, ]
+                                        q0[1:10,]      
+                                        
                                 }
                         }
                 }
@@ -147,7 +146,7 @@ predictNextWord <- function(inputText, ngramModel, myBadWords, algo = "basic"){
                 ## Add the different tokens with their weight
                 ## -----------------------------------------------------
                 ## for final answer add probability for each tokens
-                answer  <- rbindlist(list(q4,q3,q2,q1,q0))
+                answer  <- rbindlist(list(q4,q3,q2,q0))
                 answer[, c(
                         "index",
                         "type"

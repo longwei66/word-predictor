@@ -49,7 +49,7 @@ load(paste('../data/Rda/sampleText_', sampleSizeM, '_.Rda', sep = ""))
 set.seed(29706)
 
 # Build a corpus of 100 lines of the initial test data
-TestCorpus <- quanteda::corpus(base::sample(c(textSample$testingBlogs#,
+TestCorpus <- quanteda::corpus(base::sample(c(textSample$testingBlogs #,
                                                 #textSample$testingNews,
                                                 #textSample$testingTwitter
                                                 ), size = 100))
@@ -61,10 +61,14 @@ names(myTestCorpus) <- c("sentence")
 myTestCorpus$sentence <- as.character(myTestCorpus$sentence)
 
 # Extract last word
-myTestCorpus$inputText <- gsub(pattern = '\\(|\\)|\\"', replacement = "", x = myTestCorpus$sentence)
-myTestCorpus$lastWord <-  gsub(pattern = "(.*)\\s((\\w|-)+)(\\.|\\?|\\!|\\:|,|\\.{3})?$", replacement = "\\2", x = myTestCorpus$inputText) 
-myTestCorpus$inputText <-  gsub(pattern = "(.*)\\s((\\w|-)+)(\\.|\\?|\\!|\\:|,|\\.{3})?$", replacement = "\\1", x = myTestCorpus$inputText) 
+myTestCorpus$inputText <- gsub(pattern = '\\(|\\)|\\"|:|\\.{3}$|,$|\\?+$|\\!+$|\\.+$|-$| +$', replacement = "", x = myTestCorpus$sentence)
+myTestCorpus$inputText <- gsub(pattern = '\\(|\\)|\\"|:|\\.{3}$|,$|\\?+$|\\!+$|\\.+$|-$| +$', replacement = "", x = myTestCorpus$inputText)
+myTestCorpus$inputText <- gsub(pattern = '\\(|\\)|\\"|:|\\.{3}$|,$|\\?+$|\\!+$|\\.+$|-$| +$', replacement = "", x = myTestCorpus$inputText)
 
+
+
+myTestCorpus$lastWord <-  gsub(pattern = "(.*)\\s((\\w|\\w.\\w)+)$", replacement = "\\2", x = myTestCorpus$inputText) 
+myTestCorpus$inputText <-  gsub(pattern = "(.*)\\s((\\w|\\w.\\w)+)$", replacement = "\\1", x = myTestCorpus$inputText) 
 
 
 ## =============================================================================
@@ -75,10 +79,12 @@ myTestCorpus$prediction2 <- ""
 myTestCorpus$prediction3 <- ""
 myTestCorpus$freqLastWord <- 0
 myTestCorpus$predDuration <- 0
-myTestCorpus$isPredicted <- FALSE
+myTestCorpus$isPredicted3 <- FALSE
+myTestCorpus$isPredicted7 <- FALSE
 
 
-#for (i in 1:nrow(myTestCorpus)) {
+
+
 for (i in 1:nrow(myTestCorpus)) {
         message("::::::::")
         message(i)
@@ -111,7 +117,10 @@ for (i in 1:nrow(myTestCorpus)) {
                 myTestCorpus[i,]$freqLastWord <- ff[,freq.Sum]}
         
         if(myTestCorpus[i,]$lastWord %in% c(myTestCorpus[i,]$prediction1, myTestCorpus[i,]$prediction2, myTestCorpus[i,]$prediction1)){
-                myTestCorpus[i,]$isPredicted <- TRUE
+                myTestCorpus[i,]$isPredicted3 <- TRUE
+        }
+        if(myTestCorpus[i,]$lastWord %in% a$answer[1:7,token]){
+                myTestCorpus[i,]$isPredicted7 <- TRUE
         }
         
 }
